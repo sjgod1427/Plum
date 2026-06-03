@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Replaced by Modal Volume at runtime
+chroma_db/
+uploads/
+claims.db
+
+# Secrets handled via Modal Secret
+.env
+
+# Test artifacts
+test_documents/
+*.log

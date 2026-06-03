@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "./uploads"
     MAX_FILE_SIZE_MB: int = 10
     ALLOWED_ORIGINS: str = "http://localhost:3000"
-    POLICY_TERMS_PATH: str = "../policy_terms.json"
+    POLICY_TERMS_PATH: str = "./policy_terms.json"
 
     class Config:
         env_file = ".env"
