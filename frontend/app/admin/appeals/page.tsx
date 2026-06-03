@@ -106,7 +106,9 @@ export default function AppealsPage() {
 
               {selected.ai_decision && (
                 <div className="bg-slate-50 rounded-lg p-3 text-sm space-y-1">
-                  <p className="font-medium text-slate-700">AI Decision</p>
+                  <p className="font-medium text-slate-700">
+                    {["UPHELD", "DISMISSED"].includes(selected.appeal.status) ? "Final Decision" : "AI Decision"}
+                  </p>
                   <div className="flex justify-between">
                     <StatusBadge status={selected.ai_decision.decision} size="sm" />
                     <span className="font-medium">₹{selected.ai_decision.approved_amount.toLocaleString("en-IN")}</span>
