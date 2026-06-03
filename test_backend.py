@@ -3,8 +3,8 @@ Backend test script for Plum OPD Claims API.
 
 Usage:
     1. Copy backend/.env.example to backend/.env and fill in OPENAI_API_KEY
-    2. cd backend && uvicorn main:app --reload
-    3. In a new terminal: python test_backend.py
+    2. cd backend && uv run uvicorn main:app --reload
+    3. In a new terminal: uv run test_backend.py
 
 Tests covered:
     - Health check

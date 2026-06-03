@@ -32,5 +32,8 @@ node_modules/
 .DS_Store
 Thumbs.db
 
+# Claude Code internal files
+.claude/
+
 # Test result artifacts
 test_results.md

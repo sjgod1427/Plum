@@ -15,7 +15,7 @@ export default function NewClaimPage() {
   const [form, setForm] = useState({
     member_id: "",
     member_name: "",
-    member_join_date: "",
+    member_join_date: "2024-01-01",
     treatment_date: "",
     claim_amount: "",
     hospital_name: "",

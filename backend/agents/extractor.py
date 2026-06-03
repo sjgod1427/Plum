@@ -1,6 +1,19 @@
+"""
+Document extractor — two-step pipeline:
+
+  Step 1 (FREE):  EasyOCR reads the image/PDF and returns raw text.
+  Step 2 (CHEAP): GPT-4o receives that raw text (not the image) and structures
+                  it into an ExtractedDocument via structured output.
+
+GPT-4o text tokens are ~10x cheaper than vision tokens.
+EasyOCR is completely free (runs locally on CPU, no API key).
+"""
+
 import base64
+from functools import lru_cache
 from pathlib import Path
 
+import easyocr
 import fitz  # PyMuPDF
 from openai import OpenAI
 
@@ -10,64 +23,107 @@ from models import ExtractedDocument, ExtractionResult
 client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
 
-def _file_to_base64_images(file_path: str) -> list[str]:
-    """Convert image or PDF file to list of base64-encoded PNG strings."""
-    path = Path(file_path)
+# ── EasyOCR reader (initialised once, reused across calls) ────────────────────
+
+@lru_cache(maxsize=1)
+def _get_reader() -> easyocr.Reader:
+    print("[Extractor] Initialising EasyOCR (first call only)...")
+    return easyocr.Reader(["en"], gpu=False, verbose=False)
+
+
+# ── File → raw text ───────────────────────────────────────────────────────────
+
+def _image_to_text(file_path: str) -> str:
+    """Extract raw text from an image file using EasyOCR."""
+    reader  = _get_reader()
+    results = reader.readtext(file_path, detail=0, paragraph=True)
+    return "\n".join(results)
+
+
+def _pdf_to_text(file_path: str) -> str:
+    """Render each PDF page to PNG then extract text via EasyOCR."""
+    doc   = fitz.open(file_path)
+    lines = []
+    for page_num in range(min(len(doc), 3)):
+        page = doc[page_num]
+        pix  = page.get_pixmap(matrix=fitz.Matrix(2.0, 2.0))
+        # Save page as temp PNG bytes and pass directly to EasyOCR
+        png_bytes = pix.tobytes("png")
+        reader    = _get_reader()
+        results   = reader.readtext(png_bytes, detail=0, paragraph=True)
+        lines.extend(results)
+    doc.close()
+    return "\n".join(lines)
+
+
+def _file_to_text(file_path: str) -> str:
+    """Route file to correct OCR function based on extension."""
+    path   = Path(file_path)
     suffix = path.suffix.lower()
 
-    if suffix in {".jpg", ".jpeg", ".png", ".webp", ".gif"}:
-        with open(file_path, "rb") as f:
-            return [base64.b64encode(f.read()).decode("utf-8")]
-
     if suffix == ".pdf":
-        doc = fitz.open(file_path)
-        images = []
-        for page_num in range(min(len(doc), 3)):
-            page = doc[page_num]
-            pix = page.get_pixmap(matrix=fitz.Matrix(2.0, 2.0))
-            images.append(base64.b64encode(pix.tobytes("png")).decode("utf-8"))
-        doc.close()
-        return images
+        return _pdf_to_text(file_path)
+    if suffix in {".jpg", ".jpeg", ".png", ".webp", ".gif"}:
+        return _image_to_text(file_path)
 
-    return []
+    return ""
+
+
+# ── Text → ExtractedDocument (GPT-4o text call, not vision) ──────────────────
+
+_EXTRACTION_PROMPT = """
+You are a medical document parser. Extract all visible information from the
+OCR text below and return it as a structured ExtractedDocument.
+
+Rules:
+- Set doc_type to one of: prescription, bill, diagnostic_report, pharmacy_bill
+- Set treatment_date as 'YYYY-MM-DD' if a date is visible, otherwise null
+- Return null for any field not present in the text — do not guess
+- For line_items: each entry must have a "description" field (string) and
+  an "amount" field (number). Example: description="Consultation Fee", amount=1000.
+  Skip header rows like "DESCRIPTION OF SERVICES" or "AMOUNT" — only include
+  actual charge line items with a numeric rupee value.
+- Set extraction_confidence based on how complete and readable the text is
+  (1.0 = all key fields present and clear, 0.5 = partial, 0.2 = very noisy)
+
+OCR TEXT:
+{ocr_text}
+"""
 
 
 def extract_document(file_path: str) -> ExtractedDocument:
-    """Extract structured medical data from a single uploaded document."""
-    images = _file_to_base64_images(file_path)
-    if not images:
-        raise ValueError(f"Unsupported or unreadable file: {file_path}")
+    """
+    Extract structured medical data from a single uploaded document.
 
-    content: list[dict] = [
-        {
-            "type": "text",
-            "text": (
-                "Extract all medical information visible in this document.\n"
-                "Set doc_type to one of: prescription, bill, diagnostic_report, pharmacy_bill.\n"
-                "Set treatment_date as 'YYYY-MM-DD' if visible, otherwise null.\n"
-                "Return null for any field that is not visible or not applicable — do not guess.\n"
-                "Set extraction_confidence between 0.0 (unreadable) and 1.0 (perfectly clear and complete)."
-            ),
-        }
-    ]
+    Step 1: EasyOCR reads the file → raw text (free, local)
+    Step 2: GPT-4o structures the text → ExtractedDocument (cheap text call)
+    """
+    ocr_text = _file_to_text(file_path)
 
-    for img_b64 in images:
-        content.append({
-            "type": "image_url",
-            "image_url": {
-                "url": f"data:image/png;base64,{img_b64}",
-                "detail": "high",
-            },
-        })
+    if not ocr_text.strip():
+        raise ValueError(f"Could not extract any text from: {file_path}")
 
     response = client.beta.chat.completions.parse(
         model="gpt-4o",
-        messages=[{"role": "user", "content": content}],
+        messages=[
+            {
+                "role": "user",
+                "content": _EXTRACTION_PROMPT.format(ocr_text=ocr_text),
+            }
+        ],
         response_format=ExtractedDocument,
         max_tokens=1500,
     )
-    return response.choices[0].message.parsed
+    result = response.choices[0].message.parsed
+    if result is None:
+        raise ValueError(
+            f"GPT-4o could not structure the OCR text into ExtractedDocument. "
+            f"Refusal: {response.choices[0].message.refusal}"
+        )
+    return result
 
+
+# ── Merge multiple documents into ExtractionResult ────────────────────────────
 
 def merge_extractions(
     documents: list[ExtractedDocument],
@@ -77,7 +133,7 @@ def merge_extractions(
 ) -> ExtractionResult:
     """Consolidate multiple extracted documents into a single ExtractionResult."""
 
-    # Prefer prescription for diagnosis; fall back to any doc that has it
+    # Prefer prescription diagnosis; fall back to any doc that has one
     diagnosis = ""
     for doc in documents:
         if doc.doc_type == "prescription" and doc.diagnosis:
@@ -89,14 +145,14 @@ def merge_extractions(
                 diagnosis = doc.diagnosis
                 break
 
-    # Date consistency — all doc dates must match submitted treatment date
+    # Date consistency — all doc dates must match the submitted treatment date
     date_consistent = True
     for doc in documents:
         if doc.treatment_date and doc.treatment_date != treatment_date:
             date_consistent = False
             break
 
-    # Patient name consistency — first name must appear somewhere in extracted name
+    # Patient name consistency — first name must appear somewhere
     patient_name_consistent = True
     first_name = member_name.split()[0].lower()
     for doc in documents:
@@ -105,7 +161,7 @@ def merge_extractions(
             break
 
     # Required document check
-    doc_types = {doc.doc_type for doc in documents}
+    doc_types   = {doc.doc_type for doc in documents}
     missing_docs: list[str] = []
     if "prescription" not in doc_types:
         missing_docs.append("Prescription from registered doctor")

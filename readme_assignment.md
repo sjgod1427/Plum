@@ -1,8 +1,8 @@
 # Plum OPD Claim Adjudication Tool
 
-An AI-powered full-stack web application that automates the adjudication (approval / rejection / partial / manual-review) of Outpatient Department (OPD) insurance claims. Users submit medical documents (bills, prescriptions, diagnostic reports), the system extracts structured data using GPT-4o Vision, retrieves relevant policy context via RAG, and makes an intelligent decision using an LLM agent whose system prompt encodes all adjudication rules.
+An AI-powered full-stack web application that automates the adjudication (approval / rejection / partial / manual-review) of Outpatient Department (OPD) insurance claims. Users submit medical documents (bills, prescriptions, diagnostic reports), the system extracts structured data using EasyOCR + GPT-4o, retrieves relevant policy context via RAG, and makes an intelligent decision using an LLM agent whose system prompt encodes all adjudication rules.
 
-**10 / 10 test cases passing. All 5 bonus features implemented.**
+**10 / 10 test cases passing on both direct submission and full OCR pipeline. All 5 bonus features implemented.**
 
 ---
 
@@ -36,8 +36,8 @@ An AI-powered full-stack web application that automates the adjudication (approv
 │                                                             │
 │  ┌─────────────────────┐    ┌──────────────────────────┐   │
 │  │   Extractor Agent   │    │   Adjudicator Agent      │   │
-│  │   GPT-4o Vision     │    │   GPT-4o + RAG context   │   │
-│  │   Structured Output │    │   Structured Output      │   │
+│  │   EasyOCR (free)    │    │   GPT-4o + RAG context   │   │
+│  │   + GPT-4o text     │    │   Structured Output      │   │
 │  └──────────┬──────────┘    └─────────────┬────────────┘   │
 │             │                             │                  │
 │             ▼                             ▼                  │
@@ -64,8 +64,9 @@ An AI-powered full-stack web application that automates the adjudication (approv
 4. Files saved to  /uploads/{claim_id}/
 5. Claim record created in DB  (status = PENDING)
 6. Extractor Agent:
-     ├─ Each file  →  base64  →  GPT-4o Vision
-     └─ Returns ExtractedDocument per file  →  merged into ExtractionResult
+     ├─ Each file  →  EasyOCR (free, local)  →  raw text
+     ├─ Raw text  →  GPT-4o text call (cheap)  →  ExtractedDocument (structured output)
+     └─ All documents merged into ExtractionResult
 7. Adjudicator Agent:
      ├─ RAG query built from diagnosis + doc types
      ├─ Top-5 policy chunks retrieved from ChromaDB
@@ -88,11 +89,11 @@ An AI-powered full-stack web application that automates the adjudication (approv
 |---|---|
 | Frontend | Next.js 14 (App Router), TypeScript, Tailwind CSS |
 | Backend | Python 3.12, FastAPI, Uvicorn |
-| AI / LLM | OpenAI GPT-4o (Vision + structured outputs) |
+| AI / LLM | OpenAI GPT-4o (text + structured outputs) |
 | Embeddings | OpenAI text-embedding-3-small |
 | Vector Store | ChromaDB (local persistent) |
 | Database | SQLite via SQLModel (dev) / PostgreSQL via Supabase (prod) |
-| Document Processing | GPT-4o Vision (images), PyMuPDF (PDF → PNG render) |
+| Document Processing | EasyOCR (free, local) + PyMuPDF (PDF → PNG render) |
 | CI / CD | GitHub Actions |
 
 ---
@@ -117,20 +118,15 @@ cd Plum
 ```bash
 cd backend
 
-# Create and activate virtual environment
-python -m venv .venv
-.venv\Scripts\activate          # Windows
-# source .venv/bin/activate     # macOS / Linux
-
-# Install dependencies
-pip install -r requirements.txt
+# Install dependencies (uses uv)
+uv pip install -r requirements.txt
 
 # Copy env file and add your OpenAI key
 cp .env.example .env
 # Edit .env and set OPENAI_API_KEY=sk-...
 
 # Start the server
-uvicorn main:app --reload --port 8000
+uv run uvicorn main:app --reload --port 8000
 ```
 
 The backend starts at `http://localhost:8000`.  
@@ -384,7 +380,7 @@ Valid `{section}` values: `limits`, `coverage_consultation`, `coverage_diagnosti
 
 ## Assumptions Made
 
-1. **Member join date defaults to 2024-01-01** when not provided in the claim form. All 10 test cases except TC005 use this default, which places treatment dates well past the 30-day initial waiting period.
+1. **Member join date is an explicit field on the claim submission form**, pre-filled with `2024-01-01`. In a production system this would be fetched automatically from HR records when the member ID is entered — a claimant would never know or manually enter their own policy start date. It is kept as a visible, editable field here purely for demo and testing purposes: it lets reviewers reproduce TC005 (waiting period rejection) by entering `2024-09-01`, and it makes the adjudicator's eligibility logic transparent during evaluation. All 10 test cases use `2024-01-01` except TC005 which explicitly sets `2024-09-01`.
 
 2. **Per-claim limit (₹5,000) applies to general OPD only.** Dental, diagnostic, pharmacy, and alternative medicine claims use their own category sub-limits (₹10,000 dental, ₹10,000 diagnostic, ₹15,000 pharmacy, ₹8,000 alternative). This is not stated explicitly in the policy but is implied by the sub-limit structure.
 
@@ -412,7 +408,9 @@ Valid `{section}` values: `limits`, `coverage_consultation`, `coverage_diagnosti
 
 ## Test Cases
 
-All 10 provided test cases pass. Results from the live test suite run:
+All 10 provided test cases pass on both test paths.
+
+### Direct submission (JSON, no OCR) — `test_backend.py`
 
 | ID | Scenario | Expected | Result | Amount |
 |---|---|---|---|---|
@@ -426,6 +424,25 @@ All 10 provided test cases pass. Results from the live test suite run:
 | TC008 | 3 claims same day (fraud pattern) | MANUAL_REVIEW | MANUAL_REVIEW | — |
 | TC009 | Weight loss treatment (excluded) | REJECTED | REJECTED | — |
 | TC010 | Apollo Hospitals cashless claim | APPROVED | APPROVED | ₹3,600 |
+
+### Full OCR pipeline (real document images) — `test_full_pipeline.py`
+
+Uses generated document images from `test_documents/` (run `uv run generate_test_docs.py` once to create them).
+
+| ID | Scenario | Expected | Result | Amount | Conf | Time |
+|---|---|---|---|---|---|---|
+| TC001 | Fever consultation, valid docs | APPROVED | APPROVED | ₹1,325 | 100% | 23.8s |
+| TC002 | Root canal + cosmetic whitening | PARTIAL | PARTIAL | ₹8,400 | 100% | 22.5s |
+| TC003 | Claim ₹7,500 > per-claim limit ₹5,000 | REJECTED | REJECTED | — | 95% | 28.0s |
+| TC004 | No prescription submitted | REJECTED | REJECTED | — | 90% | 14.2s |
+| TC005 | Diabetes within 90-day waiting period | REJECTED | REJECTED | — | 100% | 24.7s |
+| TC006 | Ayurvedic Panchakarma therapy | APPROVED | APPROVED | ₹4,000 | 95% | 24.6s |
+| TC007 | MRI without pre-authorization | REJECTED | REJECTED | — | 80% | 20.3s |
+| TC008 | 3 claims same day (fraud pattern) | MANUAL_REVIEW | MANUAL_REVIEW | — | 80% | 19.1s |
+| TC009 | Weight loss treatment (excluded) | REJECTED | REJECTED | — | 100% | 21.1s |
+| TC010 | Apollo Hospitals cashless claim | APPROVED | APPROVED | ₹3,600 | 95% | 22.1s |
+
+Total elapsed: 220.4s (~22s per case, 2 GPT-4o calls each)
 
 ---
 

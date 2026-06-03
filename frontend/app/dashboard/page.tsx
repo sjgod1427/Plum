@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { listClaims } from "@/lib/api";
-import type { ClaimListItem, Decision } from "@/types";
+import type { ClaimListItem } from "@/types";
 import ClaimsTable from "@/components/ClaimsTable";
 import LoadingSpinner from "@/components/LoadingSpinner";
 
@@ -16,20 +16,24 @@ const FILTERS: { label: string; value: string }[] = [
 ];
 
 export default function DashboardPage() {
-  const [claims, setClaims] = useState<ClaimListItem[]>([]);
+  const [allClaims, setAllClaims] = useState<ClaimListItem[]>([]);
   const [filter, setFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
     setLoading(true);
-    listClaims(filter || undefined)
-      .then(setClaims)
+    listClaims()
+      .then(setAllClaims)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [filter]);
+  }, []);
 
-  const breakdown = claims.reduce<Record<string, number>>((acc, c) => {
+  const claims = filter
+    ? allClaims.filter((c) => c.decision === filter)
+    : allClaims;
+
+  const breakdown = allClaims.reduce<Record<string, number>>((acc, c) => {
     const key = c.decision ?? c.status;
     acc[key] = (acc[key] ?? 0) + 1;
     return acc;
