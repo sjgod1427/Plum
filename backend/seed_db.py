@@ -10,7 +10,14 @@ Usage:
 import json
 import modal
 
-from modal_app import app, volume, VOLUME_MOUNT
+VOLUME_MOUNT = "/data"
+volume = modal.Volume.from_name("plum-data", create_if_missing=True)
+image = (
+    modal.Image.debian_slim(python_version="3.12")
+    .pip_install("sqlmodel==0.0.21", "python-dotenv==1.0.1", "pydantic-settings==2.5.2")
+    .add_local_dir(".", "/app")
+)
+app = modal.App("plum-seed", image=image)
 
 SEED_DATA = [
     {
