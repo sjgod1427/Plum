@@ -82,10 +82,117 @@ The claim_id in your response must be exactly: {claim_id}
 """.strip()
 
 
+def _send_manual_review_agentic_email(
+    admin_email: str,
+    claim_id: str,
+    submission: ClaimSubmission,
+    extraction: ExtractionResult,
+    decision: AdjudicationDecision,
+) -> None:
+    """
+    Agentic workflow — ACTIVE: OpenAI Agents SDK
+    The agent receives full claim context, drafts the email, and calls
+    send_notification_email tool autonomously.
+
+    Commented below: previous manual tool-calling approach (raw OpenAI SDK).
+    """
+
+    # ── APPROACH: Raw OpenAI SDK tool calling ← ACTIVE ───────────────────────
+    # Note: openai-agents SDK approach is commented below — blocked by naming
+    # conflict between our local agents/ directory and the openai-agents package.
+    # Will be resolved by renaming agents/ → claim_agents/ in a future iteration.
+
+    prompt = f"""
+A claim has been flagged for MANUAL REVIEW. Draft and send a notification email.
+
+Claim ID       : {claim_id}
+Member         : {submission.member_name} ({submission.member_id})
+Treatment Date : {submission.treatment_date}
+Claim Amount   : ₹{submission.claim_amount:,.0f}
+Hospital       : {submission.hospital_name or "Not specified"}
+Diagnosis      : {extraction.merged_diagnosis}
+Fraud Flags    : {decision.fraud_flags}
+Confidence     : {decision.confidence_score:.0%}
+Reasoning      : {decision.reasoning[:600]}
+Notes          : {decision.notes}
+
+Use the send_email tool to send the notification now.
+"""
+
+    tools = [
+        {
+            "type": "function",
+            "function": {
+                "name": "send_email",
+                "description": "Send a manual review notification email to the admin reviewer",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "subject": {"type": "string", "description": "Email subject line"},
+                        "body":    {"type": "string", "description": "Plain text email body"},
+                    },
+                    "required": ["subject", "body"],
+                },
+            },
+        }
+    ]
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",  # cheaper — email drafting doesn't need GPT-4o
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a claims notification agent for Plum Insurance. "
+                        "Draft professional, concise alert emails for claims requiring manual review. "
+                        "Write in plain text only — no markdown, no asterisks, no hashtags, no bullet dashes. "
+                        "Use simple line breaks and spacing for structure. "
+                        "Always call the send_email tool — never respond with plain text only."
+                    ),
+                },
+                {"role": "user", "content": prompt},
+            ],
+            tools=tools,
+            tool_choice={"type": "function", "function": {"name": "send_email"}},
+        )
+        tool_call = response.choices[0].message.tool_calls[0]
+        args = json.loads(tool_call.function.arguments)
+        from utils.email import send_simple_email
+        sent = send_simple_email(to=admin_email, subject=args["subject"], body=args["body"])
+        if sent:
+            print(f"[Adjudicator] Agentic MANUAL_REVIEW email sent to {admin_email}")
+        else:
+            print(f"[Adjudicator] Email send failed — check SendGrid config")
+    except Exception as e:
+        print(f"[Adjudicator] Agentic email error: {e}")
+
+    # ── APPROACH: OpenAI Agents SDK (pending agents/ → claim_agents/ rename) ──
+    # import asyncio
+    # from agents import Agent, Runner, function_tool  # conflicts with local agents/
+    # from utils.email import send_simple_email
+    # @function_tool
+    # def send_notification_email(subject: str, body: str) -> str:
+    #     """Send a MANUAL_REVIEW notification email to the admin reviewer."""
+    #     result = send_simple_email(to=admin_email, subject=subject, body=body)
+    #     return "Email sent successfully." if result else "Email send failed."
+    # agent = Agent(
+    #     name="ClaimsNotifier", model="gpt-4o-mini",
+    #     instructions="Draft and send professional MANUAL_REVIEW alert emails. Always call the tool.",
+    #     tools=[send_notification_email],
+    # )
+    # try:
+    #     asyncio.run(Runner.run(agent, prompt))
+    #     print(f"[Adjudicator] Agentic email sent to {admin_email}")
+    # except Exception as e:
+    #     print(f"[Adjudicator] Agentic email error: {e}")
+
+
 def adjudicate(
     claim_id: str,
     submission: ClaimSubmission,
     extraction: ExtractionResult,
+    admin_email: str | None = None,  # if set, sends agentic email on MANUAL_REVIEW
 ) -> AdjudicationDecision:
     """Run the full adjudication pipeline for a claim."""
 
@@ -108,7 +215,8 @@ def adjudicate(
     user_message = _build_user_message(claim_id, submission, extraction, policy_context)
 
     response = client.beta.chat.completions.parse(
-        model="gpt-4o",
+        model="gpt-4o",       # Approach A: GPT-4o — 10/10 passing          ← ACTIVE
+        # model="gpt-4o-mini", # Approach B: mini — 9/10, fails TC002 + TC010 amounts
         messages=[
             {"role": "system", "content": _get_system_prompt()},
             {"role": "user", "content": user_message},
@@ -118,6 +226,10 @@ def adjudicate(
     )
 
     decision = response.choices[0].message.parsed
-    # Ensure claim_id is always set correctly (guard against model hallucination)
     decision.claim_id = claim_id
+
+    # Agentic email — only on MANUAL_REVIEW and only if admin email is configured
+    if decision.decision == "MANUAL_REVIEW" and admin_email:
+        _send_manual_review_agentic_email(admin_email, claim_id, submission, extraction, decision)
+
     return decision

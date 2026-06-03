@@ -43,6 +43,40 @@ def _now() -> str:
     return datetime.utcnow().isoformat()
 
 
+# ─── GET /admin/config ───────────────────────────────────────────────────────
+
+
+@router.get("/config")
+def get_admin_config(session: Session = Depends(get_session)):
+    config = session.exec(
+        select(PolicyConfig).where(PolicyConfig.section == "admin_config")
+    ).first()
+    data = json.loads(config.config_json) if config else {}
+    return {"reviewer_email": data.get("reviewer_email", "")}
+
+
+@router.patch("/config")
+def update_admin_config(body: dict, session: Session = Depends(get_session)):
+    reviewer_email = body.get("reviewer_email", "").strip()
+    existing = session.exec(
+        select(PolicyConfig).where(PolicyConfig.section == "admin_config")
+    ).first()
+    if existing:
+        existing.config_json = json.dumps({"reviewer_email": reviewer_email})
+        existing.updated_at = _now()
+        existing.updated_by = "admin"
+        session.add(existing)
+    else:
+        session.add(PolicyConfig(
+            section="admin_config",
+            config_json=json.dumps({"reviewer_email": reviewer_email}),
+            updated_at=_now(),
+            updated_by="admin",
+        ))
+    session.commit()
+    return {"reviewer_email": reviewer_email, "status": "saved"}
+
+
 # ─── GET /admin/policy ────────────────────────────────────────────────────────
 
 

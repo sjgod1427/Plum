@@ -63,6 +63,31 @@ def submit_appeal(
     session.commit()
     session.refresh(appeal)
 
+    # Simple coded email — notify admin of new appeal
+    from utils.email import get_admin_email, send_simple_email
+    admin_email = get_admin_email(session)
+    if admin_email:
+        decision = session.exec(
+            select(ClaimDecision)
+            .where(ClaimDecision.claim_id == claim_id)
+            .order_by(ClaimDecision.created_at.desc())
+        ).first()
+        send_simple_email(
+            to=admin_email,
+            subject=f"[Plum Claims] New Appeal — {claim_id}",
+            body=(
+                f"A new appeal has been submitted and requires your review.\n\n"
+                f"Claim ID      : {claim_id}\n"
+                f"Member        : {claim.member_name} ({claim.member_id})\n"
+                f"Claim Amount  : ₹{claim.claim_amount:,.0f}\n"
+                f"Treatment Date: {claim.treatment_date}\n"
+                f"AI Decision   : {decision.decision if decision else 'N/A'}\n\n"
+                f"Appeal Reason :\n{body.appeal_reason}\n\n"
+                f"Additional Notes:\n{body.additional_notes or 'None'}\n\n"
+                f"Please log in to the admin portal to review and resolve this appeal."
+            ),
+        )
+
     return {
         "appeal_id": appeal.id,
         "claim_id": claim_id,

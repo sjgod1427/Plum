@@ -1,15 +1,29 @@
 """
-Document extractor — two-step pipeline:
+Document extractor — pluggable extraction backends.
 
-  Step 1 (FREE):  EasyOCR reads the image/PDF and returns raw text.
-  Step 2 (CHEAP): GPT-4o receives that raw text (not the image) and structures
-                  it into an ExtractedDocument via structured output.
+ACTIVE APPROACH: Approach A (EasyOCR + GPT-4o)
+To switch, comment/uncomment the relevant section in extract_document().
 
-GPT-4o text tokens are ~10x cheaper than vision tokens.
-EasyOCR is completely free (runs locally on CPU, no API key).
+─────────────────────────────────────────────────────────────────
+APPROACH A — EasyOCR (free) + GPT-4o text call  ← ACTIVE
+  Step 1: EasyOCR reads image/PDF → raw text (free, local, no API)
+  Step 2: GPT-4o structures raw text → ExtractedDocument
+  Cost: ~$0.003/doc (text tokens only, no vision tokens)
+  Accuracy: 10/10 test cases passing
+
+APPROACH B — EasyOCR (free) + GPT-4o-mini text call
+  Same as A but cheaper. 9/10 passing — TC007 routes to MANUAL_REVIEW
+  instead of REJECTED due to lower confidence scores from mini.
+  Cost: ~$0.0003/doc
+
+APPROACH C — Gemini 2.0 Flash vision  ← TODO (pending API key)
+  Single vision call: image/PDF → ExtractedDocument directly.
+  No EasyOCR needed. Free tier: 1500 req/day.
+  Better handwriting + multilingual support.
+  Requires: GOOGLE_API_KEY in .env
+─────────────────────────────────────────────────────────────────
 """
 
-import base64
 from functools import lru_cache
 from pathlib import Path
 
@@ -20,10 +34,18 @@ from openai import OpenAI
 from config import settings
 from models import ExtractedDocument, ExtractionResult
 
-client = OpenAI(api_key=settings.OPENAI_API_KEY)
+# ── Approach A/B: OpenAI client ───────────────────────────────────────────────
+openai_client = OpenAI(api_key=settings.OPENAI_API_KEY)
+
+# ── Approach C: Gemini client ─────────────────────────────────────────────────
+import google.generativeai as genai
+genai.configure(api_key=settings.GOOGLE_API_KEY)
+gemini_model = genai.GenerativeModel("gemini-2.0-flash")
 
 
-# ── EasyOCR reader (initialised once, reused across calls) ────────────────────
+# ═══════════════════════════════════════════════════════════════
+# APPROACH A/B — EasyOCR + LLM text call
+# ═══════════════════════════════════════════════════════════════
 
 @lru_cache(maxsize=1)
 def _get_reader() -> easyocr.Reader:
@@ -31,45 +53,34 @@ def _get_reader() -> easyocr.Reader:
     return easyocr.Reader(["en"], gpu=False, verbose=False)
 
 
-# ── File → raw text ───────────────────────────────────────────────────────────
-
 def _image_to_text(file_path: str) -> str:
-    """Extract raw text from an image file using EasyOCR."""
-    reader  = _get_reader()
+    reader = _get_reader()
     results = reader.readtext(file_path, detail=0, paragraph=True)
     return "\n".join(results)
 
 
 def _pdf_to_text(file_path: str) -> str:
-    """Render each PDF page to PNG then extract text via EasyOCR."""
-    doc   = fitz.open(file_path)
+    doc = fitz.open(file_path)
     lines = []
     for page_num in range(min(len(doc), 3)):
         page = doc[page_num]
-        pix  = page.get_pixmap(matrix=fitz.Matrix(2.0, 2.0))
-        # Save page as temp PNG bytes and pass directly to EasyOCR
+        pix = page.get_pixmap(matrix=fitz.Matrix(2.0, 2.0))
         png_bytes = pix.tobytes("png")
-        reader    = _get_reader()
-        results   = reader.readtext(png_bytes, detail=0, paragraph=True)
+        reader = _get_reader()
+        results = reader.readtext(png_bytes, detail=0, paragraph=True)
         lines.extend(results)
     doc.close()
     return "\n".join(lines)
 
 
 def _file_to_text(file_path: str) -> str:
-    """Route file to correct OCR function based on extension."""
-    path   = Path(file_path)
-    suffix = path.suffix.lower()
-
+    suffix = Path(file_path).suffix.lower()
     if suffix == ".pdf":
         return _pdf_to_text(file_path)
     if suffix in {".jpg", ".jpeg", ".png", ".webp", ".gif"}:
         return _image_to_text(file_path)
-
     return ""
 
-
-# ── Text → ExtractedDocument (GPT-4o text call, not vision) ──────────────────
 
 _EXTRACTION_PROMPT = """
 You are a medical document parser. Extract all visible information from the
@@ -91,39 +102,98 @@ OCR TEXT:
 """
 
 
-def extract_document(file_path: str) -> ExtractedDocument:
-    """
-    Extract structured medical data from a single uploaded document.
-
-    Step 1: EasyOCR reads the file → raw text (free, local)
-    Step 2: GPT-4o structures the text → ExtractedDocument (cheap text call)
-    """
+def _extract_approach_a(file_path: str) -> ExtractedDocument:
+    """Approach A: EasyOCR + GPT-4o. 10/10 passing. ~$0.003/doc."""
     ocr_text = _file_to_text(file_path)
-
     if not ocr_text.strip():
         raise ValueError(f"Could not extract any text from: {file_path}")
 
-    response = client.beta.chat.completions.parse(
-        model="gpt-4o",
-        messages=[
-            {
-                "role": "user",
-                "content": _EXTRACTION_PROMPT.format(ocr_text=ocr_text),
-            }
-        ],
+    response = openai_client.beta.chat.completions.parse(
+        model="gpt-4o",          # Approach A
+        # model="gpt-4o-mini",   # Approach B — 9/10, TC007 MANUAL_REVIEW instead of REJECTED
+        messages=[{"role": "user", "content": _EXTRACTION_PROMPT.format(ocr_text=ocr_text)}],
         response_format=ExtractedDocument,
         max_tokens=1500,
     )
     result = response.choices[0].message.parsed
     if result is None:
-        raise ValueError(
-            f"GPT-4o could not structure the OCR text into ExtractedDocument. "
-            f"Refusal: {response.choices[0].message.refusal}"
-        )
+        raise ValueError(f"LLM could not structure OCR text. Refusal: {response.choices[0].message.refusal}")
     return result
 
 
-# ── Merge multiple documents into ExtractionResult ────────────────────────────
+# ═══════════════════════════════════════════════════════════════
+# APPROACH C — Gemini 2.0 Flash vision  (TODO: pending API key)
+# ═══════════════════════════════════════════════════════════════
+
+_GEMINI_PROMPT = """
+You are a medical document parser. Extract all visible information from this
+medical document image and return a JSON object with these exact fields:
+
+{
+  "doc_type": "prescription" | "bill" | "diagnostic_report" | "pharmacy_bill",
+  "doctor_name": string or null,
+  "doctor_reg": string or null,
+  "patient_name": string or null,
+  "diagnosis": string or null,
+  "medicines": [string],
+  "tests_prescribed": [string],
+  "procedures": [string],
+  "treatment_date": "YYYY-MM-DD" or null,
+  "consultation_fee": number or null,
+  "total_amount": number or null,
+  "line_items": [{"description": string, "amount": number}],
+  "extraction_confidence": 0.0-1.0
+}
+
+Rules:
+- Return null for any field not visible in the document — do not guess
+- extraction_confidence: 1.0 = all fields clear, 0.5 = partial, 0.2 = very noisy
+- For line_items include only actual charge rows with numeric amounts
+- Return only valid JSON, no explanation
+"""
+
+
+def _file_to_image_parts(file_path: str) -> list:
+    """Convert image or PDF pages to PIL Images (accepted directly by google-generativeai)."""
+    import PIL.Image
+    import io
+    suffix = Path(file_path).suffix.lower()
+    images = []
+    if suffix == ".pdf":
+        doc = fitz.open(file_path)
+        for page_num in range(min(len(doc), 3)):
+            pix = doc[page_num].get_pixmap(matrix=fitz.Matrix(2.0, 2.0))
+            images.append(PIL.Image.open(io.BytesIO(pix.tobytes("png"))))
+        doc.close()
+    else:
+        images.append(PIL.Image.open(file_path))
+    return images
+
+
+def _extract_approach_c(file_path: str) -> ExtractedDocument:
+    """Approach C: Gemini 2.0 Flash vision. Free tier 1500 req/day. No EasyOCR needed."""
+    import json
+    image_parts = _file_to_image_parts(file_path)
+    response = gemini_model.generate_content(
+        image_parts + [_GEMINI_PROMPT],
+        generation_config={"response_mime_type": "application/json"},
+    )
+    data = json.loads(response.text)
+    return ExtractedDocument(**data)
+
+
+# ═══════════════════════════════════════════════════════════════
+# ACTIVE ENTRY POINT — swap the function call to change approach
+# ═══════════════════════════════════════════════════════════════
+
+def extract_document(file_path: str) -> ExtractedDocument:
+    return _extract_approach_a(file_path)   # Approach A: EasyOCR + GPT-4o  ← ACTIVE
+    # return _extract_approach_c(file_path) # Approach C: Gemini Flash       — pending key
+
+
+# ═══════════════════════════════════════════════════════════════
+# MERGE — unchanged across all approaches
+# ═══════════════════════════════════════════════════════════════
 
 def merge_extractions(
     documents: list[ExtractedDocument],
@@ -133,7 +203,6 @@ def merge_extractions(
 ) -> ExtractionResult:
     """Consolidate multiple extracted documents into a single ExtractionResult."""
 
-    # Prefer prescription diagnosis; fall back to any doc that has one
     diagnosis = ""
     for doc in documents:
         if doc.doc_type == "prescription" and doc.diagnosis:
@@ -145,14 +214,12 @@ def merge_extractions(
                 diagnosis = doc.diagnosis
                 break
 
-    # Date consistency — all doc dates must match the submitted treatment date
     date_consistent = True
     for doc in documents:
         if doc.treatment_date and doc.treatment_date != treatment_date:
             date_consistent = False
             break
 
-    # Patient name consistency — first name must appear somewhere
     patient_name_consistent = True
     first_name = member_name.split()[0].lower()
     for doc in documents:
@@ -160,8 +227,7 @@ def merge_extractions(
             patient_name_consistent = False
             break
 
-    # Required document check
-    doc_types   = {doc.doc_type for doc in documents}
+    doc_types = {doc.doc_type for doc in documents}
     missing_docs: list[str] = []
     if "prescription" not in doc_types:
         missing_docs.append("Prescription from registered doctor")

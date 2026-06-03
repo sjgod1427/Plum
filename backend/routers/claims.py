@@ -120,7 +120,8 @@ def submit_claim(
             submission.claim_amount,
         )
 
-        decision = adjudicate(claim_id, submission, extraction)
+        from utils.email import get_admin_email
+        decision = adjudicate(claim_id, submission, extraction, admin_email=get_admin_email(session))
 
         _save_decision(session, decision, extraction, claim_id)
         claim.status = "PROCESSED"
@@ -167,7 +168,8 @@ def submit_direct_claim(
     session.commit()
 
     try:
-        decision = adjudicate(claim_id, submission, extraction)
+        from utils.email import get_admin_email
+        decision = adjudicate(claim_id, submission, extraction, admin_email=get_admin_email(session))
         _save_decision(session, decision, extraction, claim_id)
         claim.status = "PROCESSED"
         session.add(claim)

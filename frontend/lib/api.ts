@@ -93,6 +93,20 @@ export async function rebuildRag() {
   return request("/admin/policy/rebuild-rag", { method: "POST" });
 }
 
+// ─── Admin — Config (notifications) ──────────────────────────────────────────
+
+export async function getAdminConfig(): Promise<{ reviewer_email: string }> {
+  return request<{ reviewer_email: string }>("/admin/config");
+}
+
+export async function updateAdminConfig(reviewer_email: string) {
+  return request("/admin/config", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reviewer_email }),
+  });
+}
+
 // ─── Admin — Metrics ──────────────────────────────────────────────────────────
 
 export async function getMetrics(): Promise<MetricsResponse> {

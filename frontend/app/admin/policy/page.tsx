@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getPolicy, updatePolicySection, rebuildRag } from "@/lib/api";
+import { getPolicy, updatePolicySection, rebuildRag, getAdminConfig, updateAdminConfig } from "@/lib/api";
 import LoadingSpinner from "@/components/LoadingSpinner";
 
 const SECTIONS = [
@@ -28,11 +28,16 @@ export default function PolicyPage() {
   const [rebuilding, setRebuilding] = useState(false);
   const [msg, setMsg] = useState({ text: "", ok: true });
 
+  const [reviewerEmail, setReviewerEmail] = useState("");
+  const [emailSaving, setEmailSaving] = useState(false);
+  const [emailMsg, setEmailMsg] = useState({ text: "", ok: true });
+
   useEffect(() => {
     getPolicy().then((r) => {
       setPolicy(r.policy as Record<string, unknown>);
       setSource(r.source);
     }).finally(() => setLoading(false));
+    getAdminConfig().then((r) => setReviewerEmail(r.reviewer_email || ""));
   }, []);
 
   useEffect(() => {
@@ -53,6 +58,19 @@ export default function PolicyPage() {
       setMsg({ text: "Invalid JSON or save failed.", ok: false });
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleEmailSave() {
+    setEmailSaving(true);
+    setEmailMsg({ text: "", ok: true });
+    try {
+      await updateAdminConfig(reviewerEmail);
+      setEmailMsg({ text: "Email saved. Notifications will be sent to this address.", ok: true });
+    } catch {
+      setEmailMsg({ text: "Failed to save email.", ok: false });
+    } finally {
+      setEmailSaving(false);
     }
   }
 
@@ -82,6 +100,33 @@ export default function PolicyPage() {
         <button onClick={handleRebuild} disabled={rebuilding} className="btn-secondary">
           {rebuilding ? "Rebuilding..." : "🔄 Rebuild RAG"}
         </button>
+      </div>
+
+      {/* Notification Settings */}
+      <div className="card mb-6">
+        <p className="font-semibold text-slate-800 mb-1">Notification Settings</p>
+        <p className="text-xs text-slate-500 mb-3">
+          Admin reviewer email — all <span className="font-medium text-yellow-600">MANUAL_REVIEW</span> flags
+          and <span className="font-medium text-plum-600">appeal</span> submissions will be sent here.
+          Leave blank to disable email notifications.
+        </p>
+        <div className="flex gap-3 items-start">
+          <div className="flex-1">
+            <input
+              type="email"
+              className="input"
+              placeholder="reviewer@yourcompany.com"
+              value={reviewerEmail}
+              onChange={(e) => setReviewerEmail(e.target.value)}
+            />
+          </div>
+          <button onClick={handleEmailSave} disabled={emailSaving} className="btn-primary text-sm whitespace-nowrap">
+            {emailSaving ? "Saving..." : "Save Email"}
+          </button>
+        </div>
+        {emailMsg.text && (
+          <p className={`mt-2 text-xs ${emailMsg.ok ? "text-green-600" : "text-red-600"}`}>{emailMsg.text}</p>
+        )}
       </div>
 
       <div className="grid grid-cols-3 gap-6">

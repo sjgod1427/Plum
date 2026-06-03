@@ -4,6 +4,9 @@ from functools import lru_cache
 
 class Settings(BaseSettings):
     OPENAI_API_KEY: str
+    GOOGLE_API_KEY: str = ""  # Approach C: Gemini Flash extractor
+    SENDGRID_API_KEY: str = ""
+    SENDGRID_FROM_EMAIL: str = ""  # Must be verified in SendGrid Sender Authentication
     DATABASE_URL: str = "sqlite:///./claims.db"
     CHROMA_PERSIST_DIR: str = "./chroma_db"
     UPLOAD_DIR: str = "./uploads"
