@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# Environment variables (contain API keys)
+.env
+.env.local
+.env.*.local
+
+# Databases
+*.db
+*.sqlite3
+
+# ChromaDB vector store (rebuilt at startup)
+backend/chroma_db/
+
+# Uploaded files
+backend/uploads/
+
+# Next.js build artifacts
+frontend/.next/
+frontend/out/
+
+# Node modules
+node_modules/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test result artifacts
+test_results.md
