@@ -11,7 +11,10 @@ An AI-powered full-stack web application that automates the adjudication (APPROV
 | Service | URL |
 |---|---|
 | Demo Video | https://drive.google.com/file/d/1nU14VisRTpvNiQp_tpqXb2eKk7p7Zosn/view?usp=sharing |
-| Frontend | https://plum-claims-frontend-khngw912g-sambhav-s-projects3.vercel.app/dashboard|
+| Frontend (primary) | https://plum-claims-frontend-theta.vercel.app/dashboard |
+| Frontend (mirror) | https://plum-claims-frontend-khngw912g-sambhav-s-projects3.vercel.app/dashboard |
+
+> **If the primary link shows "unable to reach" (especially on mobile), use the mirror link.** Both point to the exact same deployment. Vercel serves `*.vercel.app` from a pool of anycast edge IPs, and a few of those IPs are intermittently unreachable from some ISPs/mobile carriers — so depending on which IP DNS hands you, one hostname may fail to connect while the other loads instantly. It's a network-routing quirk on Vercel's edge, not an issue with the app (the site returns 200 the moment a reachable IP is used).
 
 ---
 
