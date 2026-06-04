@@ -20,6 +20,69 @@ const SECTIONS = [
   { key: "claim_requirements", label: "Claim Requirements" },
 ];
 
+// One-line description of what each section controls.
+const SECTION_HINTS: Record<string, string> = {
+  limits: "Overall annual, per-claim, and family floater caps (in ₹).",
+  coverage_consultation: "Doctor consultation cover — sub-limit, co-pay %, and network discount %.",
+  coverage_diagnostic: "Lab tests & scans — sub-limit, whether pre-auth is needed, and covered tests.",
+  coverage_pharmacy: "Medicines — sub-limit, generic-drug rule, and branded-drug co-pay %.",
+  coverage_dental: "Dental cover — sub-limit, covered procedures, and cosmetic exclusion.",
+  coverage_vision: "Eye care — sub-limit and what's covered (tests, glasses, LASIK).",
+  coverage_alternative: "AYUSH / alternative medicine — sub-limit, covered systems, session cap.",
+  waiting_periods: "Waiting periods in days before each condition is claimable.",
+  exclusions: "List of treatments the policy never covers.",
+  network_hospitals: "Cashless network hospitals and cashless facility rules.",
+  claim_requirements: "Documents required, submission window, and minimum claim amount.",
+};
+
+// Example schema per section — shown as a placeholder and via "Insert example"
+// so admins know the exact fields and shape expected.
+const SECTION_TEMPLATES: Record<string, unknown> = {
+  limits: { annual_limit: 50000, per_claim_limit: 5000, family_floater_limit: 150000 },
+  coverage_consultation: { covered: true, sub_limit: 2000, copay_percentage: 10, network_discount: 20 },
+  coverage_diagnostic: {
+    covered: true,
+    sub_limit: 10000,
+    pre_authorization_required: false,
+    covered_tests: ["Blood tests", "X-rays", "MRI (with pre-auth)", "CT Scan (with pre-auth)"],
+  },
+  coverage_pharmacy: { covered: true, sub_limit: 15000, generic_drugs_mandatory: true, branded_drugs_copay: 30 },
+  coverage_dental: {
+    covered: true,
+    sub_limit: 10000,
+    routine_checkup_limit: 2000,
+    procedures_covered: ["Filling", "Extraction", "Root canal", "Cleaning"],
+    cosmetic_procedures: false,
+  },
+  coverage_vision: { covered: true, sub_limit: 5000, eye_test_covered: true, glasses_contact_lenses: true, lasik_surgery: false },
+  coverage_alternative: {
+    covered: true,
+    sub_limit: 8000,
+    covered_treatments: ["Ayurveda", "Homeopathy", "Unani"],
+    therapy_sessions_limit: 20,
+  },
+  waiting_periods: {
+    initial_waiting: 30,
+    pre_existing_diseases: 365,
+    maternity: 270,
+    specific_ailments: { diabetes: 90, hypertension: 90, joint_replacement: 730 },
+  },
+  exclusions: { exclusions: ["Cosmetic procedures", "Weight loss treatments", "Infertility treatments"] },
+  network_hospitals: {
+    network_hospitals: ["Apollo Hospitals", "Fortis Healthcare", "Max Healthcare"],
+    cashless_facilities: { available: true, network_only: true, instant_approval_limit: 5000 },
+  },
+  claim_requirements: {
+    documents_required: ["Original bills and receipts", "Prescription from registered doctor"],
+    submission_timeline_days: 30,
+    minimum_claim_amount: 500,
+  },
+};
+
+function templateFor(section: string): string {
+  return JSON.stringify(SECTION_TEMPLATES[section] ?? {}, null, 2);
+}
+
 export default function PolicyPage() {
   const [policy, setPolicy] = useState<Record<string, unknown>>({});
   const [source, setSource] = useState("");
@@ -44,11 +107,18 @@ export default function PolicyPage() {
 
   useEffect(() => {
     const data = policy[activeSection];
-    setEditorValue(data ? JSON.stringify(data, null, 2) : "{}");
+    const isEmpty =
+      data == null || (typeof data === "object" && Object.keys(data as object).length === 0);
+    // Leave the box blank when empty so the example placeholder shows through.
+    setEditorValue(isEmpty ? "" : JSON.stringify(data, null, 2));
     setMsg({ text: "", ok: true });
   }, [activeSection, policy]);
 
   async function handleSave() {
+    if (!editorValue.trim()) {
+      setMsg({ text: "This section is empty — click “Insert example” or type JSON to fill it.", ok: false });
+      return;
+    }
     setSaving(true);
     setMsg({ text: "", ok: true });
     try {
@@ -156,16 +226,27 @@ export default function PolicyPage() {
 
         {/* Editor */}
         <div className="card md:col-span-2">
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-1 flex items-center justify-between">
             <p className="font-serif text-base font-medium text-ink">{SECTIONS.find((s) => s.key === activeSection)?.label}</p>
-            <button onClick={handleSave} disabled={saving} className="btn-primary text-sm">
-              {saving ? "Saving…" : "Save & Sync RAG"}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setEditorValue(templateFor(activeSection))}
+                className="btn-secondary text-xs"
+              >
+                Insert example
+              </button>
+              <button onClick={handleSave} disabled={saving} className="btn-primary text-sm">
+                {saving ? "Saving…" : "Save & Sync RAG"}
+              </button>
+            </div>
           </div>
+          <p className="mb-3 text-xs text-ink-soft">{SECTION_HINTS[activeSection]}</p>
           <textarea
-            className="h-96 w-full resize-none rounded-xl border border-ivory-line bg-ivory-head p-4 font-mono text-xs text-ink focus:outline-none focus:ring-2 focus:ring-verdict-violet/20"
+            className="h-96 w-full resize-none rounded-xl border border-ivory-line bg-ivory-head p-4 font-mono text-xs text-ink placeholder:text-ink-faint/70 focus:outline-none focus:ring-2 focus:ring-verdict-violet/20"
             value={editorValue}
             onChange={(e) => setEditorValue(e.target.value)}
+            placeholder={`Example structure for this section — click “Insert example” to start from it:\n\n${templateFor(activeSection)}`}
             spellCheck={false}
           />
           {msg.text && (

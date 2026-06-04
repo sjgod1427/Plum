@@ -10,7 +10,7 @@ An AI-powered full-stack web application that automates the adjudication (APPROV
 
 | Service | URL |
 |---|---|
-| Frontend | https://plum-claims-frontend-theta.vercel.app |
+| Frontend | https://plum-claims-frontend-theta.vercel.app/dashboard |
 | Backend API | https://sjgod1427--plum-claims-api-fastapi-app.modal.run |
 | Swagger Docs | https://sjgod1427--plum-claims-api-fastapi-app.modal.run/docs |
 | GitHub Repo | https://github.com/sjgod1427/Plum |
@@ -337,7 +337,7 @@ Green > 85% / Amber 70–85% / Red < 70% (auto-routes to MANUAL_REVIEW).
 Members appeal REJECTED or PARTIAL decisions via UI. Admin resolves (UPHELD / DISMISSED) from the appeals queue. Appeal submission triggers an automated email to the reviewer.
 
 ### 3. Admin Policy Configuration Dashboard
-`/admin/policy` — live JSON editor for all 11 policy sections. Changes persist to DB and automatically re-embed into ChromaDB RAG index.
+`/admin/policy` — live JSON editor for all 11 policy sections. Changes persist to DB and automatically re-embed into ChromaDB RAG index. Each section shows a one-line description, the expected JSON schema as a greyed placeholder, and an **Insert example** button that pre-fills the correct field structure — so an admin always knows exactly what to fill (no blank `{}` guesswork).
 
 ### 4. Evaluation Metrics for AI Accuracy
 `/admin/metrics` — accuracy, precision, recall, FPR, FNR, mean amount deviation against all 20 test cases. "Run Test Suite" re-evaluates live.
