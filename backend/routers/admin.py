@@ -432,9 +432,15 @@ def label_claim(
 
 def _get_test_cases() -> list[dict]:
     from pathlib import Path
-    path = Path(__file__).resolve().parent.parent / "test_cases.json"
-    with open(path) as f:
-        return json.load(f)["test_cases"]
+    backend_dir = Path(__file__).resolve().parent.parent   # backend/
+    project_root = backend_dir.parent                       # Plum/
+    cases = []
+    # original 10 cases live inside backend/; new 10 live at project root
+    for path in (backend_dir / "test_cases.json", project_root / "test_cases_new.json"):
+        if path.exists():
+            with open(path) as f:
+                cases.extend(json.load(f)["test_cases"])
+    return cases
 
 
 def _build_direct_request(tc: dict) -> dict:
@@ -457,7 +463,7 @@ def _build_direct_request(tc: dict) -> dict:
             "doc_type": "prescription",
             "doctor_name": rx.get("doctor_name"),
             "doctor_reg": rx.get("doctor_reg"),
-            "patient_name": input_data.get("member_name"),
+            "patient_name": input_data.get("dependent_name") or input_data.get("member_name"),
             "diagnosis": rx.get("diagnosis"),
             "medicines": medicines,
             "tests_prescribed": tests,
@@ -470,44 +476,61 @@ def _build_direct_request(tc: dict) -> dict:
         })
 
     if bill:
-        line_items = [
-            {"description": k, "amount": v}
-            for k, v in bill.items()
-            if isinstance(v, (int, float))
-        ]
+        # TC018-style physio bill: sessions × cost → single summary line item
+        if input_data.get("sessions_claimed") and bill.get("cost_per_session"):
+            n = input_data["sessions_claimed"]
+            cost = bill["cost_per_session"]
+            line_items = [{"description": f"Physiotherapy Sessions (×{n} @ ₹{cost}/session)", "amount": n * cost}]
+        else:
+            line_items = [
+                {"description": k, "amount": v}
+                for k, v in bill.items()
+                if isinstance(v, (int, float)) and k not in ("test_names",)
+            ]
         extracted_docs.append({
             "doc_type": "bill",
             "doctor_name": None,
             "doctor_reg": None,
-            "patient_name": input_data.get("member_name"),
+            "patient_name": input_data.get("dependent_name") or input_data.get("member_name"),
             "diagnosis": None,
             "medicines": [],
             "tests_prescribed": [],
             "procedures": [],
-            "treatment_date": input_data.get("treatment_date"),
-            "consultation_fee": bill.get("consultation_fee"),
+            "treatment_date": input_data.get("bill_date") or input_data.get("treatment_date"),
+            "consultation_fee": bill.get("consultation_fee") or bill.get("teleconsultation_fee"),
             "total_amount": input_data.get("claim_amount"),
             "line_items": line_items,
             "extraction_confidence": 0.95,
         })
+
+    bill_date = input_data.get("bill_date")
+    treatment_date = input_data.get("treatment_date", "2024-10-01")
+    date_consistent = not (bill_date and bill_date != treatment_date)
 
     return {
         "submission": {
             "member_id": input_data.get("member_id", "EMP_TEST"),
             "member_name": input_data.get("member_name", "Test User"),
             "member_join_date": input_data.get("member_join_date", "2024-01-01"),
-            "treatment_date": input_data.get("treatment_date", "2024-10-01"),
+            "treatment_date": treatment_date,
             "claim_amount": float(input_data.get("claim_amount", 0)),
             "hospital_name": input_data.get("hospital"),
             "cashless_request": input_data.get("cashless_request", False),
-            "ytd_claimed_amount": 0.0,
+            "ytd_claimed_amount": float(input_data.get("annual_limit_used", 0.0)),
             "previous_claims_same_day": input_data.get("previous_claims_same_day", 0),
+            "dependent_name": input_data.get("dependent_name"),
+            "dependent_age": input_data.get("dependent_age"),
+            "dependent_relation": input_data.get("dependent_relation"),
+            "is_duplicate_claim": bool(input_data.get("previous_claim_id")),
+            "previous_claim_id": input_data.get("previous_claim_id"),
+            "sessions_claimed": input_data.get("sessions_claimed"),
+            "annual_session_cap": input_data.get("annual_session_cap"),
         },
         "extraction": {
             "documents": extracted_docs,
             "merged_diagnosis": (rx.get("diagnosis") or rx.get("treatment") or "Unknown"),
             "merged_total": float(input_data.get("claim_amount", 0)),
-            "date_consistent": True,
+            "date_consistent": date_consistent,
             "patient_name_consistent": True,
             "all_required_docs_present": bool(rx),
             "missing_docs": [] if rx else ["Prescription from registered doctor"],

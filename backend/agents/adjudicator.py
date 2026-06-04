@@ -63,6 +63,13 @@ YTD Claimed     : ₹{submission.ytd_claimed_amount}
 Hospital        : {submission.hospital_name or "Not specified"}
 Cashless Request: {submission.cashless_request}
 Same-day Claims : {submission.previous_claims_same_day}
+Duplicate Flag  : {submission.is_duplicate_claim}
+Previous Claim  : {submission.previous_claim_id or "None"}
+Dependent Name  : {submission.dependent_name or "None"}
+Dependent Age   : {submission.dependent_age if submission.dependent_age is not None else "None"}
+Dependent Rel.  : {submission.dependent_relation or "None"}
+Sessions Claimed: {submission.sessions_claimed if submission.sessions_claimed is not None else "None"}
+Session Cap/Year: {submission.annual_session_cap if submission.annual_session_cap is not None else "None"}
 
 ════════════════════════════════════════
 EXTRACTED DOCUMENT DATA:

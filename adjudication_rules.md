@@ -26,13 +26,32 @@ Check if the treatment/service is covered:
 - Compare against covered services list
 - Verify it's not in exclusions list
 - Check for pre-authorization requirements
+- **OTC Medicines**: Paracetamol, Antacids, and generic Vitamins (unless prescribed for a diagnosed deficiency) are not covered. If a bill contains both covered prescription medicines and OTC items as separate line items, approve covered items only → PARTIAL decision.
+- **Teleconsultation**: Video/phone consultations via registered platforms (Practo, Apollo 24/7, mFine, etc.) are covered under consultation fees. No co-pay on fees ≤ ₹500/visit.
+- **Mental Health OPD**: Psychiatrist and psychologist consultations are covered from 2024 onwards under consultation sub-limit (₹2,500/visit).
+- **Duplicate Claims**: If a claim is flagged as a duplicate (same member, date, and diagnosis already processed), reject with `DUPLICATE_CLAIM`.
 
 ### Step 4: Limit Validation
 Verify claim amount against applicable limits:
-1. **Annual Limit**: Total claims YTD + current claim ≤ Annual limit
-2. **Sub-limits**: Category-specific limits (consultation, pharmacy, etc.)
-3. **Per-claim Limit**: Single claim cannot exceed per-claim limit
+1. **Annual Limit**: Total claims YTD + current claim ≤ ₹25,000
+2. **Sub-limits**: Category-specific limits — see coverage table below
+3. **Per-claim Limit**: Single general OPD claim cannot exceed ₹5,000. Specialty categories (dental, diagnostic, physiotherapy, etc.) use their own sub-limits.
 4. **Co-payment Calculation**: Apply co-pay percentages where applicable
+5. **Physiotherapy Session Cap**: Maximum 8 sessions per year. If sessions_claimed > cap, approve up to cap → PARTIAL.
+
+#### Coverage Categories & Sub-limits
+
+| Category | Per-claim / Sub-limit | Notes |
+|---|---|---|
+| General OPD | ₹5,000 per claim | Consultation + pharmacy/medicines |
+| Dental | ₹10,000/year | Cosmetic procedures excluded |
+| Diagnostic | ₹10,000/year | MRI/CT need pre-auth above ₹10k |
+| Pharmacy | ₹15,000/year | 30% co-pay on branded drugs |
+| Vision | ₹5,000/year | |
+| Alternative Medicine | ₹8,000/year | Ayurveda, Homeopathy, Unani |
+| **Physiotherapy** | **₹10,000/year, max 8 sessions** | **Not subject to ₹5,000 per-claim limit** |
+| **Teleconsultation** | **₹500 per visit** | **No co-pay; registered platforms only** |
+| **Mental Health OPD** | **₹2,500 per visit** | **Covered from 2024; standard co-pay** |
 
 ### Step 5: Medical Necessity Review
 Evaluate if treatment was medically necessary:
@@ -57,6 +76,7 @@ A claim is **REJECTED** if ANY of the following apply:
 - `POLICY_INACTIVE`: Policy not active on treatment date
 - `WAITING_PERIOD`: Treatment during waiting period
 - `MEMBER_NOT_COVERED`: Claimant not found in policy records
+- `DEPENDENT_AGE_EXCEEDED`: Dependent child exceeds maximum covered age of 25 years
 
 ### Category 2: Documentation Issues
 - `MISSING_DOCUMENTS`: Required documents not submitted

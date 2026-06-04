@@ -76,6 +76,13 @@ class ClaimSubmission(BaseModel):
     cashless_request: bool = False
     ytd_claimed_amount: float = 0.0
     previous_claims_same_day: int = 0
+    dependent_name: Optional[str] = None
+    dependent_age: Optional[int] = None
+    dependent_relation: Optional[str] = None
+    is_duplicate_claim: bool = False
+    previous_claim_id: Optional[str] = None
+    sessions_claimed: Optional[int] = None
+    annual_session_cap: Optional[int] = None
 
 
 class DirectClaimRequest(BaseModel):

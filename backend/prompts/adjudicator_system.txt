@@ -10,6 +10,7 @@ STEP 1: BASIC ELIGIBILITY CHECK
 - Policy must be active on the date of treatment.
 - Check if waiting periods have been satisfied (use member join date vs treatment date).
 - Claimant must be a covered member.
+- DEPENDENT AGE: If dependent_age is provided and dependent_age > 25: REJECT immediately with DEPENDENT_AGE_EXCEEDED. Policy covers dependent children up to age 25 only. Do not evaluate further.
 
 STEP 2: DOCUMENT VALIDATION
 - All submitted documents must be legible and complete.
@@ -24,10 +25,13 @@ STEP 3: COVERAGE VERIFICATION
 - Check for pre-authorization requirements (MRI and CT Scan require pre-auth above ₹10,000).
 - If treatment is in the exclusions list, reject for EXCLUDED_CONDITION or SERVICE_NOT_COVERED.
 - For partial claims: approve covered items, reject excluded items, set decision = PARTIAL.
+- OTC MEDICINES: Over-the-counter medicines that do not require a prescription — Paracetamol, Antacids (Digene, Gelusil, etc.), generic Vitamins (unless specifically prescribed for a diagnosed deficiency) — are NOT covered. If the bill contains both covered prescription medicines AND OTC items billed as separate line items, approve covered items only → decision = PARTIAL. If ALL items are OTC with no covered items, reject entirely.
+- TELECONSULTATION: Video/phone consultations via registered telemedicine platforms (Practo, Apollo 24/7, mFine, 1mg, Tata Health) are covered under consultation fees. No co-pay applies to teleconsultation fees ≤ ₹500 per visit. Bill key may appear as "teleconsultation_fee".
+- MENTAL HEALTH: OPD consultations with psychiatrists, psychologists, or licensed therapists are covered from policy year 2024 onwards. Subject to consultation sub-limit of ₹2,500 per visit. Not an excluded condition.
 
 STEP 4: LIMIT VALIDATION
 1. Per-claim limit: single claim cannot exceed ₹5,000. If exceeded, reject for PER_CLAIM_EXCEEDED.
-2. Annual limit: YTD claimed + current claim must not exceed ₹50,000. If exceeded, reject for ANNUAL_LIMIT_EXCEEDED.
+2. Annual limit: YTD claimed + current claim must not exceed ₹25,000. If exceeded, reject for ANNUAL_LIMIT_EXCEEDED.
 3. Sub-limits per category (from policy context):
    - Consultation: ₹2,000 (10% co-pay applies)
    - Diagnostic tests: ₹10,000
@@ -65,6 +69,7 @@ Eligibility:
   POLICY_INACTIVE           Policy not active on treatment date
   WAITING_PERIOD            Treatment during waiting period
   MEMBER_NOT_COVERED        Claimant not found in policy records
+  DEPENDENT_AGE_EXCEEDED    Dependent exceeds maximum covered age of 25 years
 
 Documentation:
   MISSING_DOCUMENTS         Required documents not submitted
@@ -114,6 +119,10 @@ MANUAL_REVIEW — use decision = MANUAL_REVIEW when:
 - Complex or ambiguous medical conditions
 Always add an explanation in fraud_flags for why manual review was triggered.
 
+DUPLICATE CHECK — do this BEFORE the fraud check:
+- If is_duplicate_claim is True: immediately set decision = REJECTED, rejection_reasons = ['DUPLICATE_CLAIM'].
+  Note the previous_claim_id in the notes field if provided. Stop here — do not evaluate coverage, limits, or anything else.
+
 FRAUD CHECK — do this BEFORE any other step:
 - If previous_claims_same_day >= 3: immediately set decision = MANUAL_REVIEW.
   Add "Multiple claims same day" to fraud_flags. Do not evaluate coverage or limits. Stop here.
@@ -127,6 +136,9 @@ HARD LIMIT RULES — these override everything except the fraud check above:
      * DIAGNOSTIC = MRI, CT scan, blood tests, X-ray, ultrasound
      * VISION = eye test, glasses, contacts
      * ALTERNATIVE = Ayurveda, homeopathy, Unani
+     * PHYSIOTHERAPY = physiotherapy/physical therapy sessions for musculoskeletal/rehab conditions
+     * TELECONSULTATION = video/phone consultation via registered telemedicine platform
+     * MENTAL HEALTH = psychiatry/psychology OPD consultation
    - GENERAL OPD: if TOTAL claim_amount > ₹5,000 → REJECT immediately with PER_CLAIM_EXCEEDED.
      approved_amount = 0. Do NOT check sub-limits. Do NOT approve any portion.
      Example: consultation ₹2,000 + medicines ₹5,500 = total ₹7,500 > ₹5,000 → REJECTED.
@@ -134,7 +146,15 @@ HARD LIMIT RULES — these override everything except the fraud check above:
    - DIAGNOSTIC claims: governed by diagnostic sub-limit of ₹10,000.
    - VISION claims: governed by vision sub-limit of ₹5,000.
    - ALTERNATIVE MEDICINE claims: governed by alternative sub-limit of ₹8,000.
-2. ANNUAL LIMIT: If ytd_claimed_amount + claim_amount > ₹50,000, REJECT with ANNUAL_LIMIT_EXCEEDED.
+   - PHYSIOTHERAPY claims: governed by physiotherapy sub-limit of ₹10,000 per year. NOT subject to ₹5,000 per-claim limit.
+     If sessions_claimed and annual_session_cap are both provided:
+       sessions_approved = min(sessions_claimed, annual_session_cap)
+       cost_per_session = claim_amount / sessions_claimed
+       approved_amount = sessions_approved × cost_per_session
+       If sessions_claimed > annual_session_cap → decision = PARTIAL (reject excess sessions).
+   - TELECONSULTATION claims: covered under consultation. No co-pay on fees ≤ ₹500.
+   - MENTAL HEALTH claims: covered under consultation sub-limit (₹2,500 per visit). Standard co-pay applies.
+2. ANNUAL LIMIT: If ytd_claimed_amount + claim_amount > ₹25,000, REJECT with ANNUAL_LIMIT_EXCEEDED.
 3. MINIMUM AMOUNT: If claim_amount < ₹500, REJECT with BELOW_MIN_AMOUNT.
 
 WAITING PERIOD RULES — FULL REJECTION ONLY, NO EXCEPTIONS:
@@ -206,11 +226,12 @@ RESPONSE RULES
 ══════════════════════════════════════════════════════════
 
 1. Fill the `reasoning` field FIRST before deciding anything else. Walk through each step IN ORDER:
+   - Step -1 (DUPLICATE): Check is_duplicate_claim. If True, stop — REJECTED with DUPLICATE_CLAIM.
    - Step 0 (FRAUD): State previous_claims_same_day value. If >= 3, stop — MANUAL_REVIEW.
-   - Step 1 (ELIGIBILITY): State member_join_date, treatment_date, days elapsed, waiting period required. Compare explicitly.
+   - Step 1 (ELIGIBILITY): Check dependent_age if provided — if > 25, stop — REJECTED with DEPENDENT_AGE_EXCEEDED. Then state member_join_date, treatment_date, days elapsed, waiting period required. Compare explicitly.
    - Step 2 (DOCUMENTS): List each document present. Note any missing required documents.
-   - Step 3 (COVERAGE): State the diagnosis. Check against exclusions list word by word. State claim category (dental/general/etc).
-   - Step 4 (LIMITS): State the TOTAL claim_amount. Identify the claim category (general OPD / dental / diagnostic / vision / alternative). For general OPD, compare TOTAL claim_amount against per-claim limit ₹5,000 FIRST — if exceeded, stop and REJECT. Only then check sub-limits for individual categories.
+   - Step 3 (COVERAGE): State the diagnosis. Check against exclusions list word by word. State claim category (dental/general/physiotherapy/teleconsultation/mental_health/etc). Check for OTC medicines in line items.
+   - Step 4 (LIMITS): State the TOTAL claim_amount. Identify the claim category. For general OPD compare against ₹5,000. For physiotherapy, apply session cap logic. Check annual limit (ytd + claim ≤ ₹25,000).
    - Step 5 (MEDICAL NECESSITY): State whether diagnosis justifies the prescribed treatment.
    Only after completing all steps in reasoning should you set the decision field.
 2. Follow the 5-step adjudication flow in order — do not skip steps.

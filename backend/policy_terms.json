@@ -8,7 +8,7 @@
     "dependents_covered": true
   },
   "coverage_details": {
-    "annual_limit": 50000,
+    "annual_limit": 25000,
     "per_claim_limit": 5000,
     "family_floater_limit": 150000,
     "consultation_fees": {
@@ -65,6 +65,27 @@
         "Unani"
       ],
       "therapy_sessions_limit": 20
+    },
+    "physiotherapy": {
+      "covered": true,
+      "sub_limit": 10000,
+      "max_sessions_per_year": 8,
+      "cost_per_session_limit": 1000,
+      "notes": "Not subject to general OPD per-claim limit of Rs.5000. Session cap of 8 per year applies."
+    },
+    "teleconsultation": {
+      "covered": true,
+      "per_visit_limit": 500,
+      "copay_percentage": 0,
+      "registered_platforms": ["Practo", "Apollo 24/7", "mFine", "Tata Health", "1mg"],
+      "notes": "Video and phone consultations via registered telemedicine platforms. No copay on fees up to Rs.500."
+    },
+    "mental_health": {
+      "covered": true,
+      "effective_from": "2024-01-01",
+      "per_visit_limit": 2500,
+      "sub_limit": 10000,
+      "notes": "Psychiatrist and psychologist OPD consultations covered from policy year 2024 onwards."
     }
   },
   "waiting_periods": {
@@ -88,8 +109,14 @@
     "HIV/AIDS treatment",
     "Alcoholism/drug abuse treatment",
     "Non-allopathic treatments (except listed)",
-    "Vitamins and supplements (unless prescribed for deficiency)"
+    "Vitamins and supplements (unless prescribed for deficiency)",
+    "OTC medicines (Paracetamol, Antacids, generic Vitamins) unless no covered prescription items exist in same bill"
   ],
+  "dependent_coverage": {
+    "max_dependent_age": 25,
+    "covered_relations": ["Spouse", "Son", "Daughter"],
+    "notes": "Dependent children covered up to age 25. Claims for dependents above 25 are rejected with DEPENDENT_AGE_EXCEEDED."
+  },
   "claim_requirements": {
     "documents_required": [
       "Original bills and receipts",
