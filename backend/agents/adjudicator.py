@@ -46,6 +46,23 @@ def _build_user_message(
             "extraction_confidence": doc.extraction_confidence,
         })
 
+    # Compute actual date gap when date_consistent is False
+    date_gap_note = ""
+    if not extraction.date_consistent:
+        from datetime import datetime as _dt
+        doc_dates = []
+        for doc in extraction.documents:
+            if doc.treatment_date:
+                try:
+                    doc_dates.append(_dt.strptime(doc.treatment_date, "%Y-%m-%d"))
+                except ValueError:
+                    pass
+        if len(doc_dates) >= 2:
+            gap_days = (max(doc_dates) - min(doc_dates)).days
+            date_gap_note = f"\nDate Gap (days)  : {gap_days}  ({'SOFT — pharmacy pickup delay' if 1 <= gap_days <= 7 else 'HARD — major mismatch' if gap_days > 7 else 'OCR noise — same date'})"
+        else:
+            date_gap_note = "\nDate Gap (days)  : unknown"
+
     return f"""
 RETRIEVED POLICY CONTEXT:
 {policy_text}
@@ -75,7 +92,7 @@ Session Cap/Year: {submission.annual_session_cap if submission.annual_session_ca
 EXTRACTED DOCUMENT DATA:
 ════════════════════════════════════════
 Merged Diagnosis          : {extraction.merged_diagnosis}
-Date Consistent           : {extraction.date_consistent}
+Date Consistent           : {extraction.date_consistent}{date_gap_note}
 Patient Name Consistent   : {extraction.patient_name_consistent}
 All Required Docs Present : {extraction.all_required_docs_present}
 Missing Docs              : {extraction.missing_docs}
