@@ -10,6 +10,7 @@ An AI-powered full-stack web application that automates the adjudication (APPROV
 
 | Service | URL |
 |---|---|
+| Demo Video | https://drive.google.com/file/d/1nU14VisRTpvNiQp_tpqXb2eKk7p7Zosn/view?usp=sharing |
 | Frontend | https://plum-claims-frontend-theta.vercel.app/dashboard |
 | Backend API | https://sjgod1427--plum-claims-api-fastapi-app.modal.run |
 | Swagger Docs | https://sjgod1427--plum-claims-api-fastapi-app.modal.run/docs |
