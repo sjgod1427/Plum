@@ -315,7 +315,6 @@ On MANUAL_REVIEW: a GPT-4o-mini agent receives full claim context, drafts a prof
 Policy terms chunked into 11 semantic sections, embedded with `text-embedding-3-small`, stored in ChromaDB. Each adjudication retrieves top-5 relevant chunks to inject into the LLM context window.
 
 ### 8. Pluggable Extraction Architecture
-Three approaches in code, switchable with one line:
-- **Approach A** (active): EasyOCR + GPT-4o — 10/10
+Two approaches in code, switchable with one line in `extract_document()`:
+- **Approach A** (active): EasyOCR + GPT-4o — 10/10, ~$0.003/doc
 - **Approach B**: EasyOCR + GPT-4o-mini — 9/10, ~15x cheaper
-- **Approach C**: Gemini 2.0 Flash vision — free tier, commented pending API key

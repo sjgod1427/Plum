@@ -2,7 +2,6 @@
 Document extractor — pluggable extraction backends.
 
 ACTIVE APPROACH: Approach A (EasyOCR + GPT-4o)
-To switch, comment/uncomment the relevant section in extract_document().
 
 ─────────────────────────────────────────────────────────────────
 APPROACH A — EasyOCR (free) + GPT-4o text call  ← ACTIVE
@@ -15,12 +14,6 @@ APPROACH B — EasyOCR (free) + GPT-4o-mini text call
   Same as A but cheaper. 9/10 passing — TC007 routes to MANUAL_REVIEW
   instead of REJECTED due to lower confidence scores from mini.
   Cost: ~$0.0003/doc
-
-APPROACH C — Gemini 2.0 Flash vision  ← TODO (pending API key)
-  Single vision call: image/PDF → ExtractedDocument directly.
-  No EasyOCR needed. Free tier: 1500 req/day.
-  Better handwriting + multilingual support.
-  Requires: GOOGLE_API_KEY in .env
 ─────────────────────────────────────────────────────────────────
 """
 
@@ -34,10 +27,7 @@ from openai import OpenAI
 from config import settings
 from models import ExtractedDocument, ExtractionResult
 
-# ── Approach A/B: OpenAI client ───────────────────────────────────────────────
 openai_client = OpenAI(api_key=settings.OPENAI_API_KEY)
-
-# ── Approach C: Gemini client — imported lazily inside _extract_approach_c() ──
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -119,76 +109,11 @@ def _extract_approach_a(file_path: str) -> ExtractedDocument:
 
 
 # ═══════════════════════════════════════════════════════════════
-# APPROACH C — Gemini 2.0 Flash vision  (TODO: pending API key)
-# ═══════════════════════════════════════════════════════════════
-
-_GEMINI_PROMPT = """
-You are a medical document parser. Extract all visible information from this
-medical document image and return a JSON object with these exact fields:
-
-{
-  "doc_type": "prescription" | "bill" | "diagnostic_report" | "pharmacy_bill",
-  "doctor_name": string or null,
-  "doctor_reg": string or null,
-  "patient_name": string or null,
-  "diagnosis": string or null,
-  "medicines": [string],
-  "tests_prescribed": [string],
-  "procedures": [string],
-  "treatment_date": "YYYY-MM-DD" or null,
-  "consultation_fee": number or null,
-  "total_amount": number or null,
-  "line_items": [{"description": string, "amount": number}],
-  "extraction_confidence": 0.0-1.0
-}
-
-Rules:
-- Return null for any field not visible in the document — do not guess
-- extraction_confidence: 1.0 = all fields clear, 0.5 = partial, 0.2 = very noisy
-- For line_items include only actual charge rows with numeric amounts
-- Return only valid JSON, no explanation
-"""
-
-
-def _file_to_image_parts(file_path: str) -> list:
-    """Convert image or PDF pages to PIL Images (accepted directly by google-generativeai)."""
-    import PIL.Image
-    import io
-    suffix = Path(file_path).suffix.lower()
-    images = []
-    if suffix == ".pdf":
-        doc = fitz.open(file_path)
-        for page_num in range(min(len(doc), 3)):
-            pix = doc[page_num].get_pixmap(matrix=fitz.Matrix(2.0, 2.0))
-            images.append(PIL.Image.open(io.BytesIO(pix.tobytes("png"))))
-        doc.close()
-    else:
-        images.append(PIL.Image.open(file_path))
-    return images
-
-
-def _extract_approach_c(file_path: str) -> ExtractedDocument:
-    """Approach C: Gemini 2.0 Flash vision. Free tier 1500 req/day. No EasyOCR needed."""
-    import json
-    import google.generativeai as genai
-    genai.configure(api_key=settings.GOOGLE_API_KEY)
-    gemini_model = genai.GenerativeModel("gemini-2.0-flash")
-    image_parts = _file_to_image_parts(file_path)
-    response = gemini_model.generate_content(
-        image_parts + [_GEMINI_PROMPT],
-        generation_config={"response_mime_type": "application/json"},
-    )
-    data = json.loads(response.text)
-    return ExtractedDocument(**data)
-
-
-# ═══════════════════════════════════════════════════════════════
-# ACTIVE ENTRY POINT — swap the function call to change approach
+# ACTIVE ENTRY POINT
 # ═══════════════════════════════════════════════════════════════
 
 def extract_document(file_path: str) -> ExtractedDocument:
-    return _extract_approach_a(file_path)   # Approach A: EasyOCR + GPT-4o  ← ACTIVE
-    # return _extract_approach_c(file_path) # Approach C: Gemini Flash       — pending key
+    return _extract_approach_a(file_path)
 
 
 # ═══════════════════════════════════════════════════════════════
