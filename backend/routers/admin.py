@@ -431,9 +431,9 @@ def label_claim(
 
 
 def _get_test_cases() -> list[dict]:
-    import os
-    path = os.path.join(os.path.dirname(__file__), "..", "test_cases.json")
-    with open(os.path.abspath(path)) as f:
+    from pathlib import Path
+    path = Path(__file__).resolve().parent.parent / "test_cases.json"
+    with open(path) as f:
         return json.load(f)["test_cases"]
 
 

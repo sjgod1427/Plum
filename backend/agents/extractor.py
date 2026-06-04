@@ -37,10 +37,7 @@ from models import ExtractedDocument, ExtractionResult
 # ── Approach A/B: OpenAI client ───────────────────────────────────────────────
 openai_client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
-# ── Approach C: Gemini client ─────────────────────────────────────────────────
-import google.generativeai as genai
-genai.configure(api_key=settings.GOOGLE_API_KEY)
-gemini_model = genai.GenerativeModel("gemini-2.0-flash")
+# ── Approach C: Gemini client — imported lazily inside _extract_approach_c() ──
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -173,6 +170,9 @@ def _file_to_image_parts(file_path: str) -> list:
 def _extract_approach_c(file_path: str) -> ExtractedDocument:
     """Approach C: Gemini 2.0 Flash vision. Free tier 1500 req/day. No EasyOCR needed."""
     import json
+    import google.generativeai as genai
+    genai.configure(api_key=settings.GOOGLE_API_KEY)
+    gemini_model = genai.GenerativeModel("gemini-2.0-flash")
     image_parts = _file_to_image_parts(file_path)
     response = gemini_model.generate_content(
         image_parts + [_GEMINI_PROMPT],
