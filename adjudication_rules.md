@@ -5,9 +5,17 @@ This document outlines the rules and logic for adjudicating (approving/rejecting
 
 ## Adjudication Flow
 
+### Pre-Step: Duplicate Check
+- If `is_duplicate_claim` flag is True: **REJECT immediately** with `DUPLICATE_CLAIM`. Do not evaluate further.
+
+### Step 0: Fraud Check
+- If `previous_claims_same_day >= 3`: **MANUAL_REVIEW** immediately. Do not evaluate further.
+- If extraction confidence < 0.5 on any document: flag as low quality, **MANUAL_REVIEW**.
+
 ### Step 1: Basic Eligibility Check
 - **Policy Status**: Policy must be active on the date of treatment
-- **Waiting Period**: Check if waiting periods have been satisfied
+- **Dependent Age**: If claim is for a dependent and `dependent_age > 25`: **REJECT** with `DEPENDENT_AGE_EXCEEDED`
+- **Waiting Period**: Check if waiting periods have been satisfied (`treatment_date − member_join_date`). Never use gestation weeks or disease onset as a proxy.
 - **Member Verification**: Claimant must be a covered member (employee/dependent)
 
 ### Step 2: Document Validation
@@ -18,7 +26,10 @@ All submitted documents must meet these criteria:
   - Doctor's registration number must be valid (format: [State Code]/[Number]/[Year])
   - Hospital/Clinic registration must be verifiable
   - Bills must have proper headers and stamps
-- **Date Consistency**: All documents must have matching treatment dates
+- **Date Consistency**: Date gap is computed across document dates.
+  - Gap = 0: OCR noise — minor confidence deduction only.
+  - Gap 1–7 days (soft mismatch): Normal pharmacy pickup delay. Route to **MANUAL_REVIEW**. Never reject with `DATE_MISMATCH`.
+  - Gap > 7 days (hard mismatch): **REJECT** with `DATE_MISMATCH`.
 - **Patient Details**: Name and age must match policy records (minor variations acceptable)
 
 ### Step 3: Coverage Verification
@@ -29,7 +40,7 @@ Check if the treatment/service is covered:
 - **OTC Medicines**: Paracetamol, Antacids, and generic Vitamins (unless prescribed for a diagnosed deficiency) are not covered. If a bill contains both covered prescription medicines and OTC items as separate line items, approve covered items only → PARTIAL decision.
 - **Teleconsultation**: Video/phone consultations via registered platforms (Practo, Apollo 24/7, mFine, etc.) are covered under consultation fees. No co-pay on fees ≤ ₹500/visit.
 - **Mental Health OPD**: Psychiatrist and psychologist consultations are covered from 2024 onwards under consultation sub-limit (₹2,500/visit).
-- **Duplicate Claims**: If a claim is flagged as a duplicate (same member, date, and diagnosis already processed), reject with `DUPLICATE_CLAIM`.
+- **Duplicate Claims**: Handled at Pre-Step before eligibility check (see above).
 
 ### Step 4: Limit Validation
 Verify claim amount against applicable limits:
@@ -121,6 +132,7 @@ Send for human review when:
 - Complex medical conditions
 - System confidence <70%
 - Member appeals automated decision
+- Bill/pharmacy date is 1–7 days after prescription date (soft date mismatch)
 
 ### 3. Network vs Non-Network
 - **Network providers**: Apply network discounts, cashless possible

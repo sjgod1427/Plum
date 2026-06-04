@@ -207,29 +207,40 @@ Full interactive docs at `/docs` when backend is running.
 Claim Submitted
       │
       ▼
-Step 0: FRAUD CHECK (same_day_claims >= 3?)
-      ├── YES → MANUAL_REVIEW + Email Agent
+Step -1: DUPLICATE CHECK (is_duplicate_claim = True?)
+      ├── YES → REJECTED (DUPLICATE_CLAIM)
       └── NO
             ▼
-      Step 1: ELIGIBILITY (policy active? waiting periods met?)
-            ├── FAIL → REJECTED (WAITING_PERIOD / POLICY_INACTIVE)
-            └── PASS
+      Step 0: FRAUD CHECK (same_day_claims >= 3?)
+            ├── YES → MANUAL_REVIEW + Email Agent
+            └── NO
                   ▼
-            Step 2: DOCUMENTS (prescription present? legible?)
-                  ├── FAIL → REJECTED (MISSING_DOCUMENTS)
+            Step 1: ELIGIBILITY
+                  ├── Dependent age > 25?  → REJECTED (DEPENDENT_AGE_EXCEEDED)
+                  ├── Waiting period not met? → REJECTED (WAITING_PERIOD)
                   └── PASS
                         ▼
-                  Step 3: COVERAGE (treatment covered? not excluded?)
-                        ├── FAIL → REJECTED (SERVICE_NOT_COVERED / EXCLUDED)
+                  Step 2: DOCUMENTS
+                        ├── Missing prescription? → REJECTED (MISSING_DOCUMENTS)
+                        ├── Date gap > 7 days?  → REJECTED (DATE_MISMATCH)
+                        ├── Date gap 1–7 days?  → MANUAL_REVIEW (soft mismatch)
                         └── PASS
                               ▼
-                        Step 4: LIMITS (per-claim / annual / sub-limits)
-                              ├── FAIL → REJECTED (PER_CLAIM_EXCEEDED)
+                        Step 3: COVERAGE (treatment covered? OTC items? excluded?)
+                              ├── Fully excluded → REJECTED (SERVICE_NOT_COVERED)
+                              ├── Pre-auth missing → REJECTED (PRE_AUTH_MISSING)
+                              ├── Partially excluded (OTC, cosmetic) → PARTIAL
                               └── PASS
                                     ▼
-                              Step 5: MEDICAL NECESSITY
-                                    ├── ALL OK → Apply co-pay → APPROVED
-                                    └── PARTIAL/DOUBT → PARTIAL or MANUAL_REVIEW
+                              Step 4: LIMITS (annual / per-claim / sub-limits / session cap)
+                                    ├── Annual limit exceeded → REJECTED (ANNUAL_LIMIT_EXCEEDED)
+                                    ├── Per-claim limit exceeded → REJECTED (PER_CLAIM_EXCEEDED)
+                                    ├── Session cap exceeded → PARTIAL
+                                    └── PASS
+                                          ▼
+                                    Step 5: MEDICAL NECESSITY
+                                          ├── ALL OK → Apply co-pay → APPROVED
+                                          └── DOUBT → MANUAL_REVIEW
 ```
 
 ---
@@ -256,7 +267,7 @@ Step 0: FRAUD CHECK (same_day_claims >= 3?)
 18. **Physiotherapy has its own ₹10,000 sub-limit** (max 8 sessions/year) and is NOT subject to the ₹5,000 general OPD per-claim limit.
 19. **Teleconsultation** via registered platforms (Practo, Apollo 24/7, etc.) is covered under consultation fees at ₹500/visit with no co-pay.
 20. **Mental health OPD** (psychiatrist/psychologist) is covered from policy year 2024 onwards under consultation sub-limit.
-21. **TC014 (Unregistered Doctor)** cannot be auto-rejected without an MCI registry API lookup. The system validates registration format only; TC014's `MH/99999/2023` is structurally valid. This case routes to MANUAL_REVIEW and is the one known gap in the 20-case suite.
+21. **TC014 (Unregistered Doctor)** cannot be auto-rejected without an MCI registry API lookup. The system validates registration format only; TC014's `MH/99999/2023` is structurally valid (STATE/NUMBER/YEAR), so the claim gets APPROVED instead of REJECTED. This is the one known gap in the 20-case suite.
 22. **`annual_session_cap` is auto-read from `policy_terms.json`** by the backend when `sessions_claimed` is provided but cap is absent — the user never has to enter policy-internal limits on the form.
 
 ---
@@ -282,37 +293,37 @@ Step 0: FRAUD CHECK (same_day_claims >= 3?)
 
 ### Original 10 cases — full OCR pipeline — `test_full_pipeline.py`
 
-| ID | Expected | Result | Conf | Time |
-|---|---|---|---|---|
-| TC001 | APPROVED | APPROVED | 85% | 34.1s |
-| TC002 | PARTIAL | PARTIAL | 90% | 26.5s |
-| TC003 | REJECTED | REJECTED | 100% | 24.1s |
-| TC004 | REJECTED | REJECTED | 100% | 17.6s |
-| TC005 | REJECTED | REJECTED | 90% | 24.2s |
-| TC006 | APPROVED | APPROVED | 95% | 25.1s |
-| TC007 | REJECTED | REJECTED | 90% | 22.9s |
-| TC008 | MANUAL_REVIEW | MANUAL_REVIEW | 60% | 28.0s |
-| TC009 | REJECTED | REJECTED | 90% | 23.6s |
-| TC010 | APPROVED | APPROVED | 75% | 25.2s |
+| ID | Expected | Got | Conf | Time | Status |
+|---|---|---|---|---|---|
+| TC001 | APPROVED | APPROVED | 100% | 34.7s | PASS |
+| TC002 | PARTIAL | PARTIAL | 100% | 26.5s | PASS |
+| TC003 | REJECTED | REJECTED | 100% | 22.4s | PASS |
+| TC004 | REJECTED | REJECTED | 100% | 13.5s | PASS |
+| TC005 | REJECTED | REJECTED | 100% | 24.3s | PASS |
+| TC006 | APPROVED | APPROVED | 100% | 22.5s | PASS |
+| TC007 | REJECTED | REJECTED | 90% | 20.1s | PASS |
+| TC008 | MANUAL_REVIEW | MANUAL_REVIEW | 80% | 28.7s | PASS |
+| TC009 | REJECTED | REJECTED | 95% | 20.4s | PASS |
+| TC010 | APPROVED | APPROVED | 100% | 20.9s | PASS |
 
-Total elapsed: ~251s (~25s per case)
+Total elapsed: ~234s (~23s per case)
 
 ### Extended 10 cases — full OCR pipeline — `test_full_pipeline.py`
 
-| ID | Scenario | Expected | Rule tested |
-|---|---|---|---|
-| TC011 | Annual limit exhausted (₹24,800 / ₹25,000 used) | REJECTED | Annual limit ₹25,000 |
-| TC012 | Duplicate claim (previous CLM-20241028-0045) | REJECTED | Duplicate flag detection |
-| TC013 | Dependent age 26 > max 25 | REJECTED | Dependent age limit |
-| TC014 | Doctor reg `MH/99999/2023` not in MCI DB | MANUAL_REVIEW* | Structural reg validation |
-| TC015 | OTC medicines (Paracetamol, Antacid) in bill | PARTIAL | OTC exclusion rule |
-| TC016 | Antenatal check-up after 270-day maternity wait | APPROVED | Maternity waiting period |
-| TC017 | Teleconsultation via Practo ₹500 | APPROVED | Teleconsultation coverage |
-| TC018 | 10 physio sessions, cap is 8 | PARTIAL | Session cap enforcement |
-| TC019 | Bill date 3 days after prescription (mismatch) | MANUAL_REVIEW | Date inconsistency → low confidence |
-| TC020 | Psychiatrist OPD for anxiety disorder | APPROVED | Mental health coverage (2024) |
+| ID | Scenario | Expected | Got | Conf | Time | Status |
+|---|---|---|---|---|---|---|
+| TC011 | Annual limit exhausted (₹24,800 / ₹25,000 used) | REJECTED | REJECTED | 85% | 23.7s | PASS |
+| TC012 | Duplicate claim (previous CLM-20241028-0045) | REJECTED | REJECTED | 100% | 19.5s | PASS |
+| TC013 | Dependent age 26 > max 25 | REJECTED | REJECTED | 100% | 23.7s | PASS |
+| TC014 | Doctor reg `MH/99999/2023` not in MCI DB | REJECTED | APPROVED* | 100% | 25.0s | KNOWN GAP |
+| TC015 | OTC medicines (Paracetamol, Antacid) in bill | PARTIAL | PARTIAL | 90% | 24.8s | PASS |
+| TC016 | Antenatal check-up after 270-day maternity wait | APPROVED | APPROVED | 90% | 21.1s | PASS |
+| TC017 | Teleconsultation via Practo ₹500 | APPROVED | APPROVED | 95% | 22.5s | PASS |
+| TC018 | 10 physio sessions, cap is 8 | PARTIAL | PARTIAL | 90% | 23.0s | PASS |
+| TC019 | Bill date 3 days after prescription (mismatch) | MANUAL_REVIEW | MANUAL_REVIEW | 80% | 34.0s | PASS |
+| TC020 | Psychiatrist OPD for anxiety disorder | APPROVED | APPROVED | 90% | 21.4s | PASS |
 
-*TC014 expected REJECTED but system cannot look up MCI registry — routes to MANUAL_REVIEW. Documented limitation.
+*TC014: system cannot look up MCI registry — `MH/99999/2023` is structurally valid so claim gets APPROVED. Documented limitation (assumption #21).
 
 ---
 
