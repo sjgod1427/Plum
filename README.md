@@ -2,7 +2,7 @@
 
 An AI-powered full-stack web application that automates the adjudication (APPROVED / REJECTED / PARTIAL / MANUAL_REVIEW) of Outpatient Department (OPD) insurance claims. Users submit medical documents (bills, prescriptions, diagnostic reports), the system extracts structured data using EasyOCR + GPT-4o, retrieves relevant policy context via RAG, and makes an intelligent decision using an LLM agent whose system prompt encodes all adjudication rules.
 
-**10 / 10 test cases passing on both direct submission and full OCR pipeline. All 5 bonus features implemented plus extras.**
+**19 / 20 test cases (TC001–TC020) passing. TC014 requires an external MCI registry API — documented limitation. All 5 bonus features implemented plus extras.**
 
 ---
 
@@ -196,7 +196,7 @@ Full interactive docs at `/docs` when backend is running.
 | Method | Endpoint | Description |
 |---|---|---|
 | `GET` | `/admin/metrics` | Accuracy metrics + per-case breakdown |
-| `POST` | `/admin/metrics/run-test-suite` | Run all 10 test cases live |
+| `POST` | `/admin/metrics/run-test-suite` | Run all 20 test cases live |
 | `PATCH` | `/admin/metrics/{claim_id}/label` | Label with ground truth |
 
 ---
@@ -237,7 +237,7 @@ Step 0: FRAUD CHECK (same_day_claims >= 3?)
 ## Assumptions Made
 
 1. **Member join date** is explicit on the form (pre-filled `2024-01-01`). In production, fetched from HR records automatically.
-2. **Per-claim limit (₹5,000) applies to general OPD only.** Dental/diagnostic/pharmacy/alternative use own sub-limits.
+2. **Per-claim limit (₹5,000) applies to general OPD only.** Dental/diagnostic/pharmacy/alternative/physiotherapy use own sub-limits.
 3. **Waiting period violation → full REJECTED**, never PARTIAL.
 4. **Cashless network claims use 20% discount only** — no additional co-pay (avoids double deduction).
 5. **Fraud check is Step 0** — `previous_claims_same_day >= 3` immediately routes to MANUAL_REVIEW.
@@ -246,9 +246,17 @@ Step 0: FRAUD CHECK (same_day_claims >= 3?)
 8. **Extraction confidence < 0.6 forces MANUAL_REVIEW** regardless of adjudication outcome.
 9. **YTD claimed amount trusted from caller** — no cross-claim aggregation in this implementation.
 10. **Vitamins/supplements excluded unless diagnosis indicates deficiency.**
-11. **Test suite uses fixed IDs** (`CLM_TC001`–`CLM_TC010`) with upsert — repeated runs don't accumulate duplicates.
+11. **Test suite uses fixed IDs** (`CLM_TC001`–`CLM_TC020`) with upsert — repeated runs don't accumulate duplicates.
 12. **SQLite for local dev** — switching `DATABASE_URL` to PostgreSQL requires no code changes.
 13. **Email notifications are optional** — silently skipped if SendGrid not configured. Adjudication unaffected.
+14. **Annual OPD limit is ₹25,000** (revised from initial ₹50,000 based on `test_cases_new.json` TC011 scenario).
+15. **Dependent child coverage ends at age 25.** Claims for dependents above this age are rejected with `DEPENDENT_AGE_EXCEEDED`.
+16. **Duplicate claim detection trusts `is_duplicate_claim` flag** from caller — no cross-claim DB query in this implementation.
+17. **OTC medicines (Paracetamol, Antacids, Vitamins) are excluded** unless prescribed for a diagnosed deficiency and billed as separate line items alongside covered prescription drugs.
+18. **Physiotherapy has its own ₹10,000 sub-limit** (max 8 sessions/year) and is NOT subject to the ₹5,000 general OPD per-claim limit.
+19. **Teleconsultation** via registered platforms (Practo, Apollo 24/7, etc.) is covered under consultation fees at ₹500/visit with no co-pay.
+20. **Mental health OPD** (psychiatrist/psychologist) is covered from policy year 2024 onwards under consultation sub-limit.
+21. **TC014 (Unregistered Doctor)** cannot be auto-rejected without an MCI registry API lookup. The system validates registration format only; TC014's `MH/99999/2023` is structurally valid. This case routes to MANUAL_REVIEW and is the one known gap in the 20-case suite.
 
 ---
 

@@ -1,0 +1,340 @@
+{
+  "test_cases": [
+    {
+      "case_id": "TC011",
+      "case_name": "Annual Limit Exhausted - Rejected",
+      "description": "Member has already used full annual OPD limit",
+      "input_data": {
+        "member_id": "EMP011",
+        "member_name": "Nandini Iyer",
+        "treatment_date": "2024-11-10",
+        "claim_amount": 3500,
+        "annual_limit_used": 24800,
+        "annual_limit_total": 25000,
+        "documents": {
+          "prescription": {
+            "doctor_name": "Dr. Krishnaswamy",
+            "doctor_reg": "TN/78901/2017",
+            "diagnosis": "Urinary Tract Infection",
+            "medicines_prescribed": ["Nitrofurantoin", "Cranberry extract"]
+          },
+          "bill": {
+            "consultation_fee": 1000,
+            "medicines": 2500
+          }
+        }
+      },
+      "expected_output": {
+        "decision": "REJECTED",
+        "rejection_reasons": ["ANNUAL_LIMIT_EXHAUSTED"],
+        "notes": "Member has consumed ₹24,800 of ₹25,000 annual limit. Only ₹200 remaining, insufficient for ₹3,500 claim.",
+        "confidence_score": 0.99
+      }
+    },
+    {
+      "case_id": "TC012",
+      "case_name": "Duplicate Claim Submission - Rejected",
+      "description": "Identical claim already processed 3 days ago",
+      "input_data": {
+        "member_id": "EMP012",
+        "member_name": "Arjun Menon",
+        "treatment_date": "2024-10-28",
+        "claim_amount": 2200,
+        "previous_claim_id": "CLM-20241028-0045",
+        "documents": {
+          "prescription": {
+            "doctor_name": "Dr. Pillai",
+            "doctor_reg": "KL/12345/2016",
+            "diagnosis": "Sinusitis",
+            "medicines_prescribed": ["Amoxicillin", "Nasal spray", "Antihistamine"]
+          },
+          "bill": {
+            "consultation_fee": 800,
+            "medicines": 1400
+          }
+        }
+      },
+      "expected_output": {
+        "decision": "REJECTED",
+        "rejection_reasons": ["DUPLICATE_CLAIM"],
+        "notes": "Claim for same doctor, date, and diagnosis already approved as CLM-20241028-0045.",
+        "confidence_score": 1.0
+      }
+    },
+    {
+      "case_id": "TC013",
+      "case_name": "Dependent Age Limit Exceeded - Rejected",
+      "description": "Dependent child exceeds maximum age limit of 25 years",
+      "input_data": {
+        "member_id": "EMP013",
+        "member_name": "Shalini Bose",
+        "dependent_name": "Rohit Bose",
+        "dependent_age": 26,
+        "dependent_relation": "Son",
+        "treatment_date": "2024-11-05",
+        "claim_amount": 1800,
+        "documents": {
+          "prescription": {
+            "doctor_name": "Dr. Chatterjee",
+            "doctor_reg": "WB/56789/2018",
+            "diagnosis": "Acute gastritis",
+            "medicines_prescribed": ["Pantoprazole", "Ondansetron"]
+          },
+          "bill": {
+            "consultation_fee": 700,
+            "medicines": 1100
+          }
+        }
+      },
+      "expected_output": {
+        "decision": "REJECTED",
+        "rejection_reasons": ["DEPENDENT_AGE_EXCEEDED"],
+        "notes": "Dependent Rohit Bose (age 26) exceeds maximum dependent child age of 25 years.",
+        "confidence_score": 0.97
+      }
+    },
+    {
+      "case_id": "TC014",
+      "case_name": "Unregistered Doctor - Rejected",
+      "description": "Doctor's registration number not found in medical council database",
+      "input_data": {
+        "member_id": "EMP014",
+        "member_name": "Pooja Kulkarni",
+        "treatment_date": "2024-10-22",
+        "claim_amount": 2500,
+        "documents": {
+          "prescription": {
+            "doctor_name": "Dr. Verma",
+            "doctor_reg": "MH/99999/2023",
+            "diagnosis": "Lower back pain",
+            "medicines_prescribed": ["Diclofenac", "Muscle relaxant"]
+          },
+          "bill": {
+            "consultation_fee": 1500,
+            "medicines": 1000
+          }
+        }
+      },
+      "expected_output": {
+        "decision": "REJECTED",
+        "rejection_reasons": ["INVALID_DOCTOR_REG"],
+        "notes": "Registration MH/99999/2023 not found in Maharashtra Medical Council records. Valid registration required.",
+        "confidence_score": 0.93
+      }
+    },
+    {
+      "case_id": "TC015",
+      "case_name": "OTC Medicines Excluded - Partial Approval",
+      "description": "Prescription includes non-prescription OTC items not covered under policy",
+      "input_data": {
+        "member_id": "EMP015",
+        "member_name": "Girish Pillai",
+        "treatment_date": "2024-10-30",
+        "claim_amount": 4200,
+        "documents": {
+          "prescription": {
+            "doctor_name": "Dr. Nambiar",
+            "doctor_reg": "KL/34567/2015",
+            "diagnosis": "Respiratory tract infection",
+            "medicines_prescribed": ["Azithromycin 500mg", "Paracetamol 650mg", "Antacid syrup"]
+          },
+          "bill": {
+            "consultation_fee": 1000,
+            "azithromycin": 1700,
+            "paracetamol": 200,
+            "antacid": 300,
+            "diagnostic_tests": 1000,
+            "test_names": ["Chest X-Ray"]
+          }
+        }
+      },
+      "expected_output": {
+        "decision": "PARTIAL",
+        "approved_amount": 3700,
+        "rejected_items": [
+          "Paracetamol 650mg - OTC medicine not covered",
+          "Antacid syrup - OTC medicine not covered"
+        ],
+        "notes": "Antibiotic course and diagnostic tests approved. OTC medicines (₹500) excluded from coverage.",
+        "confidence_score": 0.88
+      }
+    },
+    {
+      "case_id": "TC016",
+      "case_name": "Maternity OPD - Approved After Waiting Period",
+      "description": "Prenatal consultation after 9-month maternity waiting period has been met",
+      "input_data": {
+        "member_id": "EMP016",
+        "member_name": "Asha Ramachandran",
+        "member_join_date": "2024-01-01",
+        "treatment_date": "2024-11-05",
+        "claim_amount": 3000,
+        "documents": {
+          "prescription": {
+            "doctor_name": "Dr. Subramanian",
+            "doctor_reg": "TN/23456/2014",
+            "diagnosis": "Antenatal check-up - 20 weeks",
+            "tests_prescribed": ["Anomaly scan", "Blood tests"],
+            "medicines_prescribed": ["Folic acid", "Iron supplements"]
+          },
+          "bill": {
+            "consultation_fee": 1000,
+            "anomaly_scan": 1500,
+            "medicines": 500
+          }
+        }
+      },
+      "expected_output": {
+        "decision": "APPROVED",
+        "approved_amount": 3000,
+        "notes": "Member joined 2024-01-01. Maternity waiting period of 270 days was met on 2024-09-28. Treatment date 2024-11-05 is within coverage.",
+        "confidence_score": 0.91
+      }
+    },
+    {
+      "case_id": "TC017",
+      "case_name": "Teleconsultation - Approved",
+      "description": "Video consultation via registered telemedicine platform within per-visit limit",
+      "input_data": {
+        "member_id": "EMP017",
+        "member_name": "Kiran Jain",
+        "treatment_date": "2024-11-01",
+        "claim_amount": 500,
+        "consultation_type": "teleconsultation",
+        "platform": "Practo",
+        "documents": {
+          "prescription": {
+            "doctor_name": "Dr. Agarwal",
+            "doctor_reg": "RJ/45678/2019",
+            "diagnosis": "Seasonal allergic rhinitis",
+            "medicines_prescribed": ["Cetirizine", "Nasal corticosteroid spray"]
+          },
+          "bill": {
+            "teleconsultation_fee": 500
+          }
+        }
+      },
+      "expected_output": {
+        "decision": "APPROVED",
+        "approved_amount": 500,
+        "notes": "Teleconsultation via registered platform Practo. Within ₹500 per-visit teleconsultation limit.",
+        "confidence_score": 0.94
+      }
+    },
+    {
+      "case_id": "TC018",
+      "case_name": "Physiotherapy Session Cap Exceeded - Partial Approval",
+      "description": "10 physiotherapy sessions claimed but policy covers maximum 8 per year",
+      "input_data": {
+        "member_id": "EMP018",
+        "member_name": "Rahul Sharma",
+        "treatment_date": "2024-10-01",
+        "claim_amount": 9000,
+        "sessions_claimed": 10,
+        "sessions_used_this_year": 0,
+        "annual_session_cap": 8,
+        "documents": {
+          "prescription": {
+            "doctor_name": "Dr. Srivastava",
+            "doctor_reg": "UP/67890/2016",
+            "diagnosis": "Lumbar spondylosis",
+            "treatment": "Physiotherapy - 10 sessions"
+          },
+          "bill": {
+            "physiotherapy_sessions": 10,
+            "cost_per_session": 900,
+            "total": 9000
+          }
+        }
+      },
+      "expected_output": {
+        "decision": "PARTIAL",
+        "approved_amount": 7200,
+        "rejected_items": [
+          "Session 9 - Annual cap of 8 sessions reached",
+          "Session 10 - Annual cap of 8 sessions reached"
+        ],
+        "notes": "Policy allows maximum 8 physiotherapy sessions per year. 2 sessions (₹1,800) rejected.",
+        "confidence_score": 0.95
+      }
+    },
+    {
+      "case_id": "TC019",
+      "case_name": "Prescription and Bill Date Mismatch - Manual Review",
+      "description": "Pharmacy bill dated 3 days after prescription - possible backdating detected",
+      "input_data": {
+        "member_id": "EMP019",
+        "member_name": "Divya Nambiar",
+        "treatment_date": "2024-10-10",
+        "claim_amount": 4000,
+        "prescription_date": "2024-10-10",
+        "bill_date": "2024-10-13",
+        "documents": {
+          "prescription": {
+            "doctor_name": "Dr. Krishnan",
+            "doctor_reg": "KL/89012/2015",
+            "diagnosis": "Viral fever with body ache",
+            "medicines_prescribed": ["Oseltamivir", "Paracetamol", "Electrolyte sachets"]
+          },
+          "bill": {
+            "consultation_fee": 1200,
+            "medicines": 2800
+          }
+        }
+      },
+      "expected_output": {
+        "decision": "MANUAL_REVIEW",
+        "flags": [
+          "Bill date (2024-10-13) is 3 days after prescription date (2024-10-10)",
+          "Possible backdating or delayed purchase detected"
+        ],
+        "notes": "Date gap between prescription and pharmacy bill requires manual verification.",
+        "confidence_score": 0.60
+      }
+    },
+    {
+      "case_id": "TC020",
+      "case_name": "Mental Health Consultation - Approved",
+      "description": "Psychiatrist OPD visit covered under updated 2024 policy terms",
+      "input_data": {
+        "member_id": "EMP020",
+        "member_name": "Sunita Rao",
+        "treatment_date": "2024-11-08",
+        "claim_amount": 2000,
+        "documents": {
+          "prescription": {
+            "doctor_name": "Dr. Malhotra",
+            "doctor_reg": "DL/56789/2012",
+            "specialization": "Psychiatrist",
+            "diagnosis": "Generalized Anxiety Disorder",
+            "medicines_prescribed": ["Escitalopram 10mg", "Clonazepam 0.25mg"]
+          },
+          "bill": {
+            "consultation_fee": 2000
+          }
+        }
+      },
+      "expected_output": {
+        "decision": "APPROVED",
+        "approved_amount": 2000,
+        "notes": "Mental health OPD consultations covered from policy year 2024 onwards. Within ₹2,500 per-visit limit.",
+        "confidence_score": 0.90
+      }
+    }
+  ],
+  "validation_notes": {
+    "scoring_guidelines": [
+      "Each test case should complete within 5 seconds",
+      "Confidence scores should be provided for all decisions",
+      "System should handle edge cases gracefully",
+      "Clear reasoning should be provided for rejections"
+    ],
+    "bonus_test_scenarios": [
+      "Handle illegible/blurry document images",
+      "Process handwritten prescriptions",
+      "Detect forged/modified documents",
+      "Handle claims in regional languages",
+      "Process multiple receipts in single claim"
+    ]
+  }
+}

@@ -24,7 +24,11 @@ import requests
 BASE   = "http://localhost:8000"
 ROOT   = Path(__file__).parent
 DOCS   = ROOT / "test_documents"
-CASES  = json.loads((ROOT / "test_cases.json").read_text())["test_cases"]
+CASES: list[dict] = []
+for _fname in ("test_cases.json", "test_cases_new.json"):
+    _p = ROOT / _fname
+    if _p.exists():
+        CASES.extend(json.loads(_p.read_text())["test_cases"])
 
 # ── Console colours (skip on Windows if no ANSI support) ─────────────────────
 
@@ -52,15 +56,22 @@ def log(tag: str, msg: str):
 def _form_data(tc: dict) -> dict:
     inp = tc["input_data"]
     return {
-        "member_id":               inp["member_id"],
-        "member_name":             inp["member_name"],
-        "member_join_date":        inp.get("member_join_date", "2024-01-01"),
-        "treatment_date":          inp["treatment_date"],
-        "claim_amount":            float(inp["claim_amount"]),
-        "hospital_name":           inp.get("hospital"),
-        "cashless_request":        inp.get("cashless_request", False),
-        "ytd_claimed_amount":      0.0,
+        "member_id":                inp["member_id"],
+        "member_name":              inp["member_name"],
+        "member_join_date":         inp.get("member_join_date", "2024-01-01"),
+        "treatment_date":           inp["treatment_date"],
+        "claim_amount":             float(inp["claim_amount"]),
+        "hospital_name":            inp.get("hospital"),
+        "cashless_request":         inp.get("cashless_request", False),
+        "ytd_claimed_amount":       float(inp.get("annual_limit_used", 0.0)),
         "previous_claims_same_day": inp.get("previous_claims_same_day", 0),
+        "dependent_name":           inp.get("dependent_name"),
+        "dependent_age":            inp.get("dependent_age"),
+        "dependent_relation":       inp.get("dependent_relation"),
+        "is_duplicate_claim":       bool(inp.get("previous_claim_id")),
+        "previous_claim_id":        inp.get("previous_claim_id"),
+        "sessions_claimed":         inp.get("sessions_claimed"),
+        "annual_session_cap":       inp.get("annual_session_cap"),
     }
 
 
@@ -228,8 +239,9 @@ def main():
     banner("PLUM FULL PIPELINE TEST  (GPT-4o Vision + Adjudication)")
     print(f"\n  Backend : {BASE}")
     print(f"  Docs    : {DOCS}")
-    print(f"  Cases   : {len(CASES)}")
-    print(f"\n  NOTE: Each case takes 15-40s (2 GPT-4o calls). Full suite ~5-7 min.")
+    print(f"  Cases   : {len(CASES)}  (TC001–TC010 original + TC011–TC020 extended)")
+    print(f"\n  NOTE: Each case takes 15-40s (2 GPT-4o calls). Full suite ~8-12 min.")
+    print(f"  TC014 expected MANUAL_REVIEW (no MCI registry — known limitation).")
 
     # Preflight check
     try:

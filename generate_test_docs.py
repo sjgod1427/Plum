@@ -33,8 +33,12 @@ from PIL import Image, ImageDraw, ImageFont
 # ── Paths ──────────────────────────────────────────────────────────────────────
 
 ROOT = Path(__file__).parent
-with open(ROOT / "test_cases.json") as f:
-    TEST_CASES = json.load(f)["test_cases"]
+TEST_CASES: list[dict] = []
+for _fname in ("test_cases.json", "test_cases_new.json"):
+    _p = ROOT / _fname
+    if _p.exists():
+        with open(_p) as _f:
+            TEST_CASES.extend(json.load(_f)["test_cases"])
 
 OUT = ROOT / "test_documents"
 
@@ -146,7 +150,7 @@ def make_prescription(tc: dict, out_path: Path, as_pdf: bool = False):
     # ── Patient / date row ───────────────────────────────────
     y = 163
     d.rectangle([40, y, 860, y+52], fill=(248, 245, 255), outline=(180, 150, 220))
-    d.text((55,  y+8),  f"Patient Name : {inp['member_name']}",
+    d.text((55,  y+8),  f"Patient Name : {inp.get('dependent_name') or inp['member_name']}",
            fill=BLACK, font=_font(13, bold=True))
     d.text((530, y+8),  f"Date : {fmt_date(date)}",
            fill=BLACK, font=_font(13))
@@ -233,14 +237,20 @@ def make_prescription(tc: dict, out_path: Path, as_pdf: bool = False):
 # ── Bill generator ─────────────────────────────────────────────────────────────
 
 BILL_LABEL = {
-    "consultation_fee": "Consultation Fee",
-    "diagnostic_tests": "Diagnostic Tests",
-    "medicines":        "Medicines / Pharmacy",
-    "root_canal":       "Root Canal Treatment",
-    "teeth_whitening":  "Teeth Whitening Procedure",
-    "mri_scan":         "MRI Lumbar Spine (with contrast)",
-    "therapy_charges":  "Panchakarma Therapy Charges",
-    "diet_plan":        "Diet Plan & Bariatric Consultation",
+    "consultation_fee":        "Consultation Fee",
+    "diagnostic_tests":        "Diagnostic Tests",
+    "medicines":               "Medicines / Pharmacy",
+    "root_canal":              "Root Canal Treatment",
+    "teeth_whitening":         "Teeth Whitening Procedure",
+    "mri_scan":                "MRI Lumbar Spine (with contrast)",
+    "therapy_charges":         "Panchakarma Therapy Charges",
+    "diet_plan":               "Diet Plan & Bariatric Consultation",
+    "teleconsultation_fee":    "Teleconsultation Fee",
+    "azithromycin":            "Azithromycin 500mg (Rx)",
+    "paracetamol":             "Paracetamol 650mg (OTC)",
+    "antacid":                 "Antacid Syrup (OTC)",
+    "anomaly_scan":            "Anomaly Scan (Ultrasound)",
+    "physiotherapy_sessions":  "Physiotherapy Sessions",
 }
 
 
@@ -248,7 +258,10 @@ def make_bill(tc: dict, out_path: Path, as_pdf: bool = False):
     inp      = tc["input_data"]
     bill     = inp["documents"]["bill"]
     hospital = inp.get("hospital", "City Specialty Hospital")
-    date     = inp["treatment_date"]
+    # TC019: bill has its own date (mismatch test) — use bill_date if present
+    date     = inp.get("bill_date") or inp["treatment_date"]
+    # TC013: claim is for a dependent — show dependent's name on bill
+    patient_name = inp.get("dependent_name") or inp["member_name"]
 
     img = Image.new("RGB", (W, H), WHITE)
     d   = ImageDraw.Draw(img)
@@ -275,7 +288,7 @@ def make_bill(tc: dict, out_path: Path, as_pdf: bool = False):
            fill=BLACK, font=_font(12, bold=True))
     d.text((420, y+8),  f"Date       : {fmt_date(date)}",
            fill=BLACK, font=_font(12))
-    d.text((55,  y+30), f"Patient    : {inp['member_name']}",
+    d.text((55,  y+30), f"Patient    : {patient_name}",
            fill=BLACK, font=_font(12))
     d.text((420, y+30), f"Member ID  : {inp['member_id']}",
            fill=GREY,  font=_font(12))
@@ -294,8 +307,16 @@ def make_bill(tc: dict, out_path: Path, as_pdf: bool = False):
     shade     = [(255, 255, 255), (247, 248, 255)]
     row       = 0
 
-    for key, amount in bill.items():
-        if key == "test_names" or not isinstance(amount, (int, float)):
+    # TC018-style: physiotherapy_sessions + cost_per_session → render as session lines
+    if inp.get("sessions_claimed") and bill.get("cost_per_session"):
+        n_sessions = inp["sessions_claimed"]
+        cost       = bill["cost_per_session"]
+        synth_bill = {f"Session {i}": cost for i in range(1, n_sessions + 1)}
+    else:
+        synth_bill = bill
+
+    for key, amount in synth_bill.items():
+        if key in ("test_names", "total") or not isinstance(amount, (int, float)):
             continue
         label = BILL_LABEL.get(key, key.replace("_", " ").title())
         d.rectangle([40, y, 860, y+32], fill=shade[row % 2])
@@ -307,7 +328,7 @@ def make_bill(tc: dict, out_path: Path, as_pdf: bool = False):
         row += 1
         y    += 32
 
-    # sub-items for test names
+    # sub-items for test names (original bill only)
     test_names = bill.get("test_names", [])
     for t in test_names:
         d.rectangle([40, y, 860, y+26], fill=shade[row % 2])
@@ -382,7 +403,7 @@ def _save(img: Image.Image, path: Path, as_pdf: bool):
 # ── Per-case document plan ─────────────────────────────────────────────────────
 
 def generate_all():
-    print("\n=== Generating test documents ===\n")
+    print(f"\n=== Generating test documents ({len(TEST_CASES)} cases) ===\n")
 
     for tc in TEST_CASES:
         cid  = tc["case_id"]
@@ -403,6 +424,10 @@ def generate_all():
             else:
                 make_bill(tc, case_dir / "bill.png")
 
+        # TC019: generate a second bill with the later bill_date clearly shown
+        if cid == "TC019":
+            print(f"         note: bill uses bill_date={tc['input_data'].get('bill_date')} (mismatch test)")
+
         # TC004 intentionally has no prescription — only bill is generated above
 
     print(f"\nDone - documents saved to: {OUT}\n")
@@ -417,19 +442,27 @@ def generate_all():
     for tc in TEST_CASES:
         inp = tc["input_data"]
         print(f"\n{tc['case_id']} — {tc['case_name']}")
-        print(f"  Member ID      : {inp['member_id']}")
-        print(f"  Member Name    : {inp['member_name']}")
-        print(f"  Policy Join    : {inp.get('member_join_date', '2024-01-01')}")
-        print(f"  Treatment Date : {inp['treatment_date']}")
-        print(f"  Claim Amount   : Rs. {inp['claim_amount']}")
-        print(f"  Hospital       : {inp.get('hospital', '(leave blank)')}")
-        print(f"  Cashless       : {inp.get('cashless_request', False)}")
-        print(f"  Same-day claims: {inp.get('previous_claims_same_day', 0)}")
-        print(f"  YTD claimed    : 0")
-        print(f"  Expected       : {tc['expected_output']['decision']}")
+        print(f"  Member ID        : {inp['member_id']}")
+        print(f"  Member Name      : {inp['member_name']}")
+        print(f"  Policy Join      : {inp.get('member_join_date', '2024-01-01')}")
+        print(f"  Treatment Date   : {inp['treatment_date']}")
+        print(f"  Claim Amount     : Rs. {inp['claim_amount']}")
+        print(f"  Hospital         : {inp.get('hospital', '(leave blank)')}")
+        print(f"  Cashless         : {inp.get('cashless_request', False)}")
+        print(f"  Same-day claims  : {inp.get('previous_claims_same_day', 0)}")
+        print(f"  YTD claimed      : {inp.get('annual_limit_used', 0)}")
+        if inp.get("dependent_name"):
+            print(f"  Dependent Name   : {inp['dependent_name']} (age {inp.get('dependent_age')}, {inp.get('dependent_relation')})")
+        if inp.get("previous_claim_id"):
+            print(f"  Duplicate of     : {inp['previous_claim_id']}")
+        if inp.get("sessions_claimed"):
+            print(f"  Sessions Claimed : {inp['sessions_claimed']} (cap: {inp.get('annual_session_cap')})")
+        if inp.get("bill_date"):
+            print(f"  Bill Date        : {inp['bill_date']} (differs from treatment date — mismatch test)")
+        print(f"  Expected         : {tc['expected_output']['decision']}")
         docs = list(tc["input_data"]["documents"].keys())
         note = " (TC007 bill is .pdf)" if tc["case_id"] == "TC007" else ""
-        print(f"  Upload files   : {', '.join(f'{d}.png' for d in docs)}{note}")
+        print(f"  Upload files     : {', '.join(f'{d}.png' for d in docs)}{note}")
 
 
 if __name__ == "__main__":
