@@ -72,6 +72,16 @@
 }
 
 @layer utilities {
+  /* Entrance keyframes (raw — used by .stagger and any animate-* below) */
+  @keyframes fade-up {
+    0% { opacity: 0; transform: translateY(12px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fade-in {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+  }
+
   /* Staggered list entrance — set --i on each child */
   .stagger > * {
     opacity: 0;
@@ -99,7 +109,7 @@
   .twinkle { animation: twinkle 6s ease-in-out infinite; }
 }
 
-/* Respect reduced motion */
+/* Respect reduced motion — but keep essential feedback (loading spinner) alive */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -111,6 +121,10 @@
   }
   .stagger > * {
     opacity: 1;
+  }
+  /* A loading spinner conveys status, not decoration — it must keep rotating */
+  .animate-spin {
+    animation: spin 1s linear infinite !important;
   }
 }
 

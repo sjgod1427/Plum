@@ -25,6 +25,9 @@ backend/uploads/
 frontend/.next/
 frontend/out/
 
+# Dev/build logs
+*.log
+
 # Node modules
 node_modules/
 

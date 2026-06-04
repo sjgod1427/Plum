@@ -60,9 +60,11 @@ export default function NewClaimPage() {
       };
       const result = await submitClaim(files, data);
       router.push(`/claims/${result.claim_id}`);
+      // Keep the loading screen up while the router navigates away.
+      // Resetting loading here would flash the form for a frame before
+      // the route actually changes to the result page.
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Submission failed");
-    } finally {
       setLoading(false);
     }
   }

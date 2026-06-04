@@ -67,29 +67,6 @@ const config: Config = {
         twilight:
           "radial-gradient(120% 140% at 15% 110%, rgba(232,120,140,0.35) 0%, rgba(0,0,0,0) 45%), radial-gradient(90% 120% at 88% -10%, rgba(150,110,200,0.30) 0%, rgba(0,0,0,0) 50%), linear-gradient(150deg, #1B1130 0%, #34204E 38%, #5E3A60 72%, #87526A 100%)",
       },
-      keyframes: {
-        "fade-up": {
-          "0%": { opacity: "0", transform: "translateY(12px)" },
-          "100%": { opacity: "1", transform: "translateY(0)" },
-        },
-        "fade-in": {
-          "0%": { opacity: "0" },
-          "100%": { opacity: "1" },
-        },
-        "bar-fill": {
-          "0%": { width: "0%" },
-        },
-        shimmer: {
-          "100%": { transform: "translateX(100%)" },
-        },
-        spin: {
-          "100%": { transform: "rotate(360deg)" },
-        },
-      },
-      animation: {
-        "fade-up": "fade-up 0.5s cubic-bezier(0.16,1,0.3,1) both",
-        "fade-in": "fade-in 0.4s ease-out both",
-      },
     },
   },
   plugins: [],
