@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { Scale, CheckCircle2, AlertTriangle } from "lucide-react";
 import { getClaim, submitAppeal } from "@/lib/api";
 import type { ClaimDetail } from "@/types";
 import DecisionCard from "@/components/DecisionCard";
 import StatusBadge from "@/components/StatusBadge";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import { PageMotion, FadeUp } from "@/components/motion";
 
 export default function ClaimDetailPage({ params }: { params: { id: string } }) {
   const [claim, setClaim] = useState<ClaimDetail | null>(null);
@@ -43,23 +45,36 @@ export default function ClaimDetailPage({ params }: { params: { id: string } }) 
   }
 
   if (loading) return <LoadingSpinner />;
-  if (error) return <div className="card text-red-600">{error}</div>;
+  if (error) return <div className="card border-l-4 border-verdict-red text-verdict-red">{error}</div>;
   if (!claim) return null;
 
-  const canAppeal = ["REJECTED", "PARTIAL"].includes(claim.decision?.decision ?? "") && claim.claim.status !== "UNDER_REVIEW";
+  const canAppeal =
+    ["REJECTED", "PARTIAL"].includes(claim.decision?.decision ?? "") &&
+    claim.claim.status !== "UNDER_REVIEW";
+
+  const meta = [
+    { label: "Claim Amount", value: `₹${claim.claim.claim_amount.toLocaleString("en-IN")}`, num: true },
+    { label: "Hospital", value: claim.claim.hospital_name ?? "Not specified" },
+    { label: "Cashless", value: claim.claim.cashless_request ? "Yes" : "No" },
+    { label: "Join Date", value: claim.claim.member_join_date },
+    { label: "YTD Claimed", value: `₹${claim.claim.ytd_claimed_amount.toLocaleString("en-IN")}`, num: true },
+    { label: "Documents", value: `${claim.documents.length} uploaded` },
+  ];
 
   return (
-    <div className="max-w-3xl mx-auto">
-      <div className="flex items-center gap-2 text-sm text-slate-500 mb-6">
-        <Link href="/dashboard" className="hover:text-plum-600">Dashboard</Link>
+    <PageMotion className="mx-auto max-w-3xl">
+      {/* Breadcrumb */}
+      <div className="mb-6 flex items-center gap-2 text-sm text-ink-faint">
+        <Link href="/dashboard" className="transition-colors hover:text-verdict-violet">Dashboard</Link>
         <span>/</span>
-        <span className="font-mono">{params.id}</span>
+        <span className="font-serif text-verdict-violet">{params.id}</span>
       </div>
 
-      <div className="flex items-start justify-between mb-6">
+      {/* Header */}
+      <div className="mb-6 flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">{claim.claim.member_name}</h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <h1 className="font-serif text-[28px] font-normal tracking-tight text-ink">{claim.claim.member_name}</h1>
+          <p className="mt-1 text-sm text-ink-soft">
             {claim.claim.member_id} · Treatment: {claim.claim.treatment_date}
           </p>
         </div>
@@ -67,51 +82,36 @@ export default function ClaimDetailPage({ params }: { params: { id: string } }) 
       </div>
 
       {/* Claim meta */}
-      <div className="card mb-6">
-        <div className="grid grid-cols-3 gap-4 text-sm">
-          <div>
-            <p className="text-slate-500">Claim Amount</p>
-            <p className="font-semibold">₹{claim.claim.claim_amount.toLocaleString("en-IN")}</p>
-          </div>
-          <div>
-            <p className="text-slate-500">Hospital</p>
-            <p className="font-semibold">{claim.claim.hospital_name ?? "Not specified"}</p>
-          </div>
-          <div>
-            <p className="text-slate-500">Cashless</p>
-            <p className="font-semibold">{claim.claim.cashless_request ? "Yes" : "No"}</p>
-          </div>
-          <div>
-            <p className="text-slate-500">Join Date</p>
-            <p className="font-semibold">{claim.claim.member_join_date}</p>
-          </div>
-          <div>
-            <p className="text-slate-500">YTD Claimed</p>
-            <p className="font-semibold">₹{claim.claim.ytd_claimed_amount.toLocaleString("en-IN")}</p>
-          </div>
-          <div>
-            <p className="text-slate-500">Documents</p>
-            <p className="font-semibold">{claim.documents.length} uploaded</p>
+      <FadeUp delay={0.05}>
+        <div className="card mb-6">
+          <div className="grid grid-cols-3 gap-5 text-sm">
+            {meta.map((m) => (
+              <div key={m.label}>
+                <p className="text-ink-faint">{m.label}</p>
+                <p className={`mt-0.5 font-semibold text-ink ${m.num ? "tnum" : ""}`}>{m.value}</p>
+              </div>
+            ))}
           </div>
         </div>
-      </div>
+      </FadeUp>
 
       {/* Decision */}
       {claim.decision ? (
         <DecisionCard decision={claim.decision} />
       ) : (
-        <div className="card text-slate-500 text-sm">Decision pending...</div>
+        <div className="card text-sm text-ink-soft">Decision pending…</div>
       )}
 
-      {/* Appeal section */}
+      {/* Appeal */}
       {canAppeal && !appealSuccess && (
         <div className="mt-6">
           {!showAppeal ? (
             <button onClick={() => setShowAppeal(true)} className="btn-secondary w-full py-3">
-              ⚖ Appeal this Decision
+              <Scale size={16} strokeWidth={1.8} />
+              Appeal this Decision
             </button>
           ) : (
-            <div className="card border-l-4 border-plum-400">
+            <div className="card border-l-4 border-verdict-violet">
               <p className="section-title">Submit an Appeal</p>
               <form onSubmit={handleAppeal} className="space-y-4">
                 <div>
@@ -122,7 +122,7 @@ export default function ClaimDetailPage({ params }: { params: { id: string } }) 
                     required
                     value={appealReason}
                     onChange={(e) => setAppealReason(e.target.value)}
-                    placeholder="Explain why you believe this decision should be reviewed..."
+                    placeholder="Explain why you believe this decision should be reviewed…"
                   />
                 </div>
                 <div>
@@ -134,10 +134,10 @@ export default function ClaimDetailPage({ params }: { params: { id: string } }) 
                     onChange={(e) => setAppealNotes(e.target.value)}
                   />
                 </div>
-                {appealError && <p className="text-sm text-red-600">{appealError}</p>}
+                {appealError && <p className="text-sm text-verdict-red">{appealError}</p>}
                 <div className="flex gap-3">
                   <button type="submit" className="btn-primary" disabled={appealLoading}>
-                    {appealLoading ? "Submitting..." : "Submit Appeal"}
+                    {appealLoading ? "Submitting…" : "Submit Appeal"}
                   </button>
                   <button type="button" onClick={() => setShowAppeal(false)} className="btn-secondary">
                     Cancel
@@ -150,16 +150,16 @@ export default function ClaimDetailPage({ params }: { params: { id: string } }) 
       )}
 
       {appealSuccess && (
-        <div className="mt-6 bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm text-green-700">
-          ✓ {appealSuccess}
+        <div className="mt-6 flex items-center gap-2 rounded-xl border-l-4 border-verdict-green bg-[#E7F3ED] px-4 py-3 text-sm text-verdict-green">
+          <CheckCircle2 size={17} strokeWidth={2} /> {appealSuccess}
         </div>
       )}
 
       {claim.claim.status === "UNDER_REVIEW" && (
-        <div className="mt-6 bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3 text-sm text-yellow-700">
-          ⚠ This claim is currently under manual review.
+        <div className="mt-6 flex items-center gap-2 rounded-xl border-l-4 border-verdict-amber bg-[#FAF0E1] px-4 py-3 text-sm text-verdict-amber">
+          <AlertTriangle size={17} strokeWidth={2} /> This claim is currently under manual review.
         </div>
       )}
-    </div>
+    </PageMotion>
   );
 }

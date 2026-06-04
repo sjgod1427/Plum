@@ -35,9 +35,10 @@ Thumbs.db
 # Claude Code internal files
 .claude/
 
+# Brainstorm visual-companion mockups
+.superpowers/
+
 # Test result artifacts
 test_results.md
-
-original_plum/
 
 original_plum/

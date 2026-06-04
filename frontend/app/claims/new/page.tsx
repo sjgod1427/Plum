@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Loader2, Sparkles } from "lucide-react";
 import { submitClaim } from "@/lib/api";
 import DocumentUpload from "@/components/DocumentUpload";
-import LoadingSpinner from "@/components/LoadingSpinner";
+import { PageMotion, FadeUp } from "@/components/motion";
 
 export default function NewClaimPage() {
   const router = useRouter();
@@ -68,132 +69,147 @@ export default function NewClaimPage() {
 
   if (loading) {
     return (
-      <div className="max-w-2xl mx-auto">
-        <LoadingSpinner text="Processing claim — extracting documents and adjudicating..." />
-        <p className="text-center text-xs text-slate-400 mt-2">This may take 20–40 seconds</p>
+      <div className="mx-auto flex max-w-2xl flex-col items-center justify-center py-24 text-center">
+        <div className="relative mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-twilight">
+          <Loader2 size={26} className="animate-spin text-white" strokeWidth={2} />
+        </div>
+        <h2 className="font-serif text-xl font-medium text-ink">Adjudicating your claim</h2>
+        <p className="mt-2 text-sm text-ink-soft">
+          Extracting documents, retrieving policy context, and reasoning through the rules…
+        </p>
+        <p className="mt-1 text-xs text-ink-faint">This usually takes 20–40 seconds</p>
       </div>
     );
   }
 
   return (
-    <div className="max-w-2xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-800">Submit New Claim</h1>
-        <p className="text-sm text-slate-500 mt-1">Upload medical documents and provide claim details</p>
+    <PageMotion className="mx-auto max-w-2xl">
+      <div className="mb-7">
+        <span className="eyebrow">New Submission</span>
+        <h1 className="page-title">
+          Submit a <em>Claim</em>
+        </h1>
+        <p className="mt-2 text-[13px] text-ink-soft">
+          Upload medical documents and provide claim details — AI decision in ~30s
+        </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-5">
         {/* Member details */}
-        <div className="card">
-          <p className="section-title">Member Details</p>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="label">Member ID</label>
-              <input className="input" required value={form.member_id} onChange={(e) => set("member_id", e.target.value)} placeholder="EMP001" />
+        <FadeUp delay={0.05}>
+          <div className="card">
+            <p className="section-title">Member Details</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="label">Member ID</label>
+                <input className="input" required value={form.member_id} onChange={(e) => set("member_id", e.target.value)} placeholder="EMP001" />
+              </div>
+              <div>
+                <label className="label">Member Name</label>
+                <input className="input" required value={form.member_name} onChange={(e) => set("member_name", e.target.value)} placeholder="Full name" />
+              </div>
+              <div>
+                <label className="label">Policy Join Date</label>
+                <input className="input" type="date" required value={form.member_join_date} onChange={(e) => set("member_join_date", e.target.value)} />
+              </div>
+              <div>
+                <label className="label">YTD Claimed (₹)</label>
+                <input className="input tnum" type="number" min="0" value={form.ytd_claimed_amount} onChange={(e) => set("ytd_claimed_amount", e.target.value)} />
+              </div>
             </div>
-            <div>
-              <label className="label">Member Name</label>
-              <input className="input" required value={form.member_name} onChange={(e) => set("member_name", e.target.value)} placeholder="Full name" />
-            </div>
-            <div>
-              <label className="label">Policy Join Date</label>
-              <input className="input" type="date" required value={form.member_join_date} onChange={(e) => set("member_join_date", e.target.value)} />
-            </div>
-            <div>
-              <label className="label">YTD Claimed (₹)</label>
-              <input className="input" type="number" min="0" value={form.ytd_claimed_amount} onChange={(e) => set("ytd_claimed_amount", e.target.value)} />
-            </div>
-          </div>
 
-          {/* Dependent toggle */}
-          <div className="mt-4 flex items-center gap-2">
-            <input
-              id="for_dependent"
-              type="checkbox"
-              className="w-4 h-4 accent-plum-600"
-              checked={form.is_for_dependent}
-              onChange={(e) => set("is_for_dependent", e.target.checked)}
-            />
-            <label htmlFor="for_dependent" className="text-sm text-slate-700">This claim is for a dependent</label>
-          </div>
+            <label className="mt-4 flex cursor-pointer items-center gap-2.5 text-sm text-ink">
+              <input
+                type="checkbox"
+                className="h-4 w-4 accent-coral"
+                checked={form.is_for_dependent}
+                onChange={(e) => set("is_for_dependent", e.target.checked)}
+              />
+              This claim is for a dependent
+            </label>
 
-          {form.is_for_dependent && (
-            <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-slate-100">
-              <div>
-                <label className="label">Dependent Name</label>
-                <input className="input" required={form.is_for_dependent} value={form.dependent_name} onChange={(e) => set("dependent_name", e.target.value)} placeholder="Full name" />
+            {form.is_for_dependent && (
+              <div className="mt-4 grid grid-cols-3 gap-4 border-t border-ivory-line2 pt-4">
+                <div>
+                  <label className="label">Dependent Name</label>
+                  <input className="input" required={form.is_for_dependent} value={form.dependent_name} onChange={(e) => set("dependent_name", e.target.value)} placeholder="Full name" />
+                </div>
+                <div>
+                  <label className="label">Age</label>
+                  <input className="input tnum" type="number" min="0" max="120" required={form.is_for_dependent} value={form.dependent_age} onChange={(e) => set("dependent_age", e.target.value)} placeholder="26" />
+                </div>
+                <div>
+                  <label className="label">Relation</label>
+                  <select className="input" required={form.is_for_dependent} value={form.dependent_relation} onChange={(e) => set("dependent_relation", e.target.value)}>
+                    <option value="">Select</option>
+                    <option value="Spouse">Spouse</option>
+                    <option value="Son">Son</option>
+                    <option value="Daughter">Daughter</option>
+                  </select>
+                </div>
               </div>
-              <div>
-                <label className="label">Age</label>
-                <input className="input" type="number" min="0" max="120" required={form.is_for_dependent} value={form.dependent_age} onChange={(e) => set("dependent_age", e.target.value)} placeholder="e.g. 26" />
-              </div>
-              <div>
-                <label className="label">Relation</label>
-                <select className="input" required={form.is_for_dependent} value={form.dependent_relation} onChange={(e) => set("dependent_relation", e.target.value)}>
-                  <option value="">Select</option>
-                  <option value="Spouse">Spouse</option>
-                  <option value="Son">Son</option>
-                  <option value="Daughter">Daughter</option>
-                </select>
-              </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        </FadeUp>
 
         {/* Claim details */}
-        <div className="card">
-          <p className="section-title">Claim Details</p>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="label">Treatment Date</label>
-              <input className="input" type="date" required value={form.treatment_date} onChange={(e) => set("treatment_date", e.target.value)} />
+        <FadeUp delay={0.1}>
+          <div className="card">
+            <p className="section-title">Claim Details</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="label">Treatment Date</label>
+                <input className="input" type="date" required value={form.treatment_date} onChange={(e) => set("treatment_date", e.target.value)} />
+              </div>
+              <div>
+                <label className="label">Claim Amount (₹)</label>
+                <input className="input tnum" type="number" min="1" step="0.01" required value={form.claim_amount} onChange={(e) => set("claim_amount", e.target.value)} placeholder="0.00" />
+              </div>
+              <div>
+                <label className="label">Hospital Name <span className="font-normal text-ink-faint">(optional)</span></label>
+                <input className="input" value={form.hospital_name} onChange={(e) => set("hospital_name", e.target.value)} placeholder="e.g. Apollo Hospitals" />
+              </div>
+              <div>
+                <label className="label">Same-day Claim Count</label>
+                <input className="input tnum" type="number" min="0" value={form.previous_claims_same_day} onChange={(e) => set("previous_claims_same_day", e.target.value)} />
+              </div>
+              <div>
+                <label className="label">Physiotherapy Sessions <span className="font-normal text-ink-faint">(if applicable)</span></label>
+                <input className="input tnum" type="number" min="1" value={form.sessions_claimed} onChange={(e) => set("sessions_claimed", e.target.value)} placeholder="e.g. 10" />
+              </div>
             </div>
-            <div>
-              <label className="label">Claim Amount (₹)</label>
-              <input className="input" type="number" min="1" step="0.01" required value={form.claim_amount} onChange={(e) => set("claim_amount", e.target.value)} placeholder="0.00" />
-            </div>
-            <div>
-              <label className="label">Hospital Name (optional)</label>
-              <input className="input" value={form.hospital_name} onChange={(e) => set("hospital_name", e.target.value)} placeholder="e.g. Apollo Hospitals" />
-            </div>
-            <div>
-              <label className="label">Same-day Claim Count</label>
-              <input className="input" type="number" min="0" value={form.previous_claims_same_day} onChange={(e) => set("previous_claims_same_day", e.target.value)} />
-            </div>
-            <div>
-              <label className="label">Physiotherapy Sessions <span className="text-slate-400 font-normal">(if applicable)</span></label>
-              <input className="input" type="number" min="1" value={form.sessions_claimed} onChange={(e) => set("sessions_claimed", e.target.value)} placeholder="e.g. 10" />
-            </div>
+            <label className="mt-4 flex cursor-pointer items-center gap-2.5 text-sm text-ink">
+              <input
+                type="checkbox"
+                className="h-4 w-4 accent-coral"
+                checked={form.cashless_request}
+                onChange={(e) => set("cashless_request", e.target.checked)}
+              />
+              Cashless request (network hospital only)
+            </label>
           </div>
-          <div className="mt-4 flex items-center gap-2">
-            <input
-              id="cashless"
-              type="checkbox"
-              className="w-4 h-4 accent-plum-600"
-              checked={form.cashless_request}
-              onChange={(e) => set("cashless_request", e.target.checked)}
-            />
-            <label htmlFor="cashless" className="text-sm text-slate-700">Cashless request (network hospital only)</label>
-          </div>
-        </div>
+        </FadeUp>
 
-        {/* Document upload */}
-        <div className="card">
-          <p className="section-title">Medical Documents</p>
-          <p className="text-xs text-slate-500 mb-3">Upload prescription, bills, diagnostic reports, pharmacy bills</p>
-          <DocumentUpload files={files} onChange={setFiles} />
-        </div>
+        {/* Documents */}
+        <FadeUp delay={0.15}>
+          <div className="card">
+            <p className="section-title">Medical Documents</p>
+            <p className="mb-3 text-xs text-ink-soft">Upload prescription, bills, diagnostic reports, pharmacy bills</p>
+            <DocumentUpload files={files} onChange={setFiles} />
+          </div>
+        </FadeUp>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
+          <div className="rounded-xl border-l-4 border-verdict-red bg-[#FAE9EB] px-4 py-3 text-sm text-verdict-red">
             {error}
           </div>
         )}
 
-        <button type="submit" className="btn-primary w-full py-3 text-base">
+        <button type="submit" className="btn-primary w-full py-3.5 text-base">
+          <Sparkles size={17} strokeWidth={2} />
           Submit Claim for Adjudication
         </button>
       </form>
-    </div>
+    </PageMotion>
   );
 }

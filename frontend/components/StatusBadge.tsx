@@ -1,25 +1,14 @@
-import type { Decision } from "@/types";
-
-const styles: Record<string, string> = {
-  APPROVED:      "bg-green-100 text-green-800 border-green-300",
-  REJECTED:      "bg-red-100 text-red-800 border-red-300",
-  PARTIAL:       "bg-orange-100 text-orange-800 border-orange-300",
-  MANUAL_REVIEW: "bg-yellow-100 text-yellow-800 border-yellow-300",
-  PENDING:       "bg-slate-100 text-slate-600 border-slate-300",
-  PROCESSED:     "bg-blue-100 text-blue-800 border-blue-300",
-  UNDER_REVIEW:  "bg-purple-100 text-purple-800 border-purple-300",
-  ERROR:         "bg-red-100 text-red-700 border-red-300",
-};
-
-const icons: Record<string, string> = {
-  APPROVED:      "✓",
-  REJECTED:      "✗",
-  PARTIAL:       "◑",
-  MANUAL_REVIEW: "⚠",
-  PENDING:       "…",
-  PROCESSED:     "●",
-  UNDER_REVIEW:  "⟳",
-  ERROR:         "!",
+const styles: Record<string, { bg: string; text: string; dot: string }> = {
+  APPROVED:      { bg: "bg-[#E7F3ED]", text: "text-verdict-green",  dot: "bg-verdict-green" },
+  REJECTED:      { bg: "bg-[#FAE9EB]", text: "text-verdict-red",    dot: "bg-verdict-red" },
+  PARTIAL:       { bg: "bg-[#FAF0E1]", text: "text-verdict-amber",  dot: "bg-verdict-amber" },
+  MANUAL_REVIEW: { bg: "bg-[#EFEBF6]", text: "text-verdict-violet", dot: "bg-verdict-violet" },
+  PENDING:       { bg: "bg-ivory-line2", text: "text-ink-soft",     dot: "bg-ink-faint" },
+  PROCESSED:     { bg: "bg-[#E7F3ED]", text: "text-verdict-green",  dot: "bg-verdict-green" },
+  UNDER_REVIEW:  { bg: "bg-[#EFEBF6]", text: "text-verdict-violet", dot: "bg-verdict-violet" },
+  UPHELD:        { bg: "bg-[#E7F3ED]", text: "text-verdict-green",  dot: "bg-verdict-green" },
+  DISMISSED:     { bg: "bg-[#FAE9EB]", text: "text-verdict-red",    dot: "bg-verdict-red" },
+  ERROR:         { bg: "bg-[#FAE9EB]", text: "text-verdict-red",    dot: "bg-verdict-red" },
 };
 
 interface Props {
@@ -28,14 +17,17 @@ interface Props {
 }
 
 export default function StatusBadge({ status, size = "md" }: Props) {
-  const cls = styles[status] ?? "bg-slate-100 text-slate-600 border-slate-300";
-  const icon = icons[status] ?? "?";
-  const sizeClass = size === "sm" ? "text-xs px-2 py-0.5" : size === "lg" ? "text-base px-4 py-1.5" : "text-sm px-3 py-1";
+  const s = styles[status] ?? styles.PENDING;
+  const sizeClass =
+    size === "sm" ? "text-[11px] px-2.5 py-1 gap-1.5" :
+    size === "lg" ? "text-sm px-3.5 py-1.5 gap-2" :
+    "text-xs px-3 py-1 gap-1.5";
+  const dotSize = size === "lg" ? "h-1.5 w-1.5" : "h-[5px] w-[5px]";
 
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full border font-medium ${cls} ${sizeClass}`}>
-      <span>{icon}</span>
-      {status.replace("_", " ")}
+    <span className={`inline-flex items-center rounded-md font-semibold tracking-[0.02em] ${s.bg} ${s.text} ${sizeClass}`}>
+      <span className={`rounded-full ${s.dot} ${dotSize}`} />
+      {status.replace(/_/g, " ")}
     </span>
   );
 }

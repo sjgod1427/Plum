@@ -4,30 +4,122 @@
 
 @layer base {
   body {
-    @apply bg-slate-50 text-slate-900 antialiased;
+    @apply bg-ivory text-ink antialiased font-sans;
+  }
+  /* Tabular figures for amounts, IDs, metrics */
+  .tnum {
+    font-variant-numeric: tabular-nums;
   }
 }
 
 @layer components {
+  /* ── Surfaces ── */
   .card {
-    @apply bg-white rounded-xl shadow-sm border border-slate-200 p-6;
+    @apply bg-ivory-card rounded-2xl border border-ivory-line p-6 shadow-soft;
   }
+  .card-flush {
+    @apply bg-ivory-card rounded-2xl border border-ivory-line shadow-soft overflow-hidden;
+  }
+
+  /* ── Buttons (minimalist, flat) ── */
   .btn-primary {
-    @apply bg-plum-600 hover:bg-plum-700 text-white font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-2 bg-coral hover:bg-coral-hover text-white font-medium text-sm px-4 py-2 rounded-lg transition-[background-color,transform] duration-150 active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100;
   }
   .btn-secondary {
-    @apply bg-white hover:bg-slate-50 text-slate-700 font-medium px-4 py-2 rounded-lg border border-slate-300 transition-colors;
+    @apply inline-flex items-center justify-center gap-2 bg-transparent hover:bg-ivory-hover text-ink-soft hover:text-ink font-medium text-sm px-4 py-2 rounded-lg border border-ivory-line transition-[background-color,color,transform] duration-150 active:scale-[0.97];
+  }
+  .btn-dark {
+    @apply inline-flex items-center justify-center gap-2 bg-ink hover:bg-plum-dark text-white font-medium text-sm px-4 py-2 rounded-lg transition-[background-color,transform] duration-150 active:scale-[0.97];
   }
   .btn-danger {
-    @apply bg-red-600 hover:bg-red-700 text-white font-medium px-4 py-2 rounded-lg transition-colors;
+    @apply inline-flex items-center justify-center gap-2 bg-verdict-red hover:brightness-95 text-white font-medium text-sm px-4 py-2 rounded-lg transition-[filter,transform] duration-150 active:scale-[0.97];
   }
+
+  /* ── Inputs ── */
   .input {
-    @apply w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-plum-500 focus:border-transparent;
+    @apply w-full bg-ivory-card border border-ivory-line rounded-xl px-3.5 py-2.5 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:border-verdict-violet/60 focus:ring-2 focus:ring-verdict-violet/15 transition-all duration-150;
   }
   .label {
-    @apply block text-sm font-medium text-slate-700 mb-1;
+    @apply block text-[13px] font-medium text-ink-soft mb-1.5;
+  }
+
+  /* ── Typography ── */
+  .page-title {
+    @apply font-serif font-normal text-ink tracking-tight;
+    font-size: 36px;
+    line-height: 1.02;
+  }
+  .page-title em {
+    @apply not-italic;
+    font-style: italic;
+    font-weight: 500;
   }
   .section-title {
-    @apply text-lg font-semibold text-slate-800 mb-4;
+    @apply font-serif text-lg font-medium text-ink mb-4;
   }
+  .eyebrow {
+    @apply inline-flex items-center gap-2 text-[10.5px] font-semibold tracking-[0.16em] uppercase text-ink-faint mb-2.5;
+  }
+  .eyebrow::before {
+    content: "";
+    @apply w-[18px] h-px bg-ink-faint/60;
+  }
+
+  /* ── Pills / filters (sliding indicator lives in FilterPills) ── */
+  .pill {
+    @apply relative z-10 text-xs font-medium px-3.5 py-2 rounded-full transition-colors duration-200;
+  }
+}
+
+@layer utilities {
+  /* Staggered list entrance — set --i on each child */
+  .stagger > * {
+    opacity: 0;
+    animation: fade-up 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation-delay: calc(var(--i, 0) * 45ms);
+  }
+
+  /* Slow ambient drift for the twilight gradient glows */
+  @keyframes drift-a {
+    0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.9; }
+    50% { transform: translate(6%, -5%) scale(1.08); opacity: 1; }
+  }
+  @keyframes drift-b {
+    0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.8; }
+    50% { transform: translate(-5%, 6%) scale(1.1); opacity: 1; }
+  }
+  .ambient-a { animation: drift-a 14s ease-in-out infinite; }
+  .ambient-b { animation: drift-b 18s ease-in-out infinite; }
+
+  /* Twinkle for star specks */
+  @keyframes twinkle {
+    0%, 100% { opacity: 0.35; }
+    50% { opacity: 0.65; }
+  }
+  .twinkle { animation: twinkle 6s ease-in-out infinite; }
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .stagger > * {
+    opacity: 1;
+  }
+}
+
+/* Custom scrollbar for dark surfaces */
+.dark-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.dark-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
 }
