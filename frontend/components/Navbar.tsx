@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import { FilePlus2, LayoutGrid, Search } from "lucide-react";
+import { FilePlus2, LayoutGrid } from "lucide-react";
 
 const userLinks = [
   { label: "Submit Claim", href: "/claims/new", icon: FilePlus2 },
@@ -23,7 +23,7 @@ export default function Navbar() {
     path === href || (href !== "/" && path.startsWith(href));
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 h-[60px] bg-plum-dark/90 backdrop-blur-md border-b border-white/[0.06] flex items-center px-7 gap-7">
+    <header className="fixed top-0 left-0 right-0 z-50 h-[60px] bg-twilight border-b border-white/[0.06] flex items-center px-7 gap-7">
       {/* Logo */}
       <Link href="/" className="relative shrink-0 mr-2">
         <span className="text-[20px] font-bold tracking-tight text-coral">plum</span>
@@ -87,14 +87,6 @@ export default function Navbar() {
           );
         })}
       </nav>
-
-      {/* Right cluster */}
-      <div className="ml-auto flex items-center gap-3.5">
-        <Search size={17} strokeWidth={1.8} className="text-white/40" />
-        <div className="flex h-[30px] w-[30px] items-center justify-center rounded-full bg-gradient-to-br from-verdict-violet to-coral text-xs font-semibold text-white">
-          SJ
-        </div>
-      </div>
     </header>
   );
 }
