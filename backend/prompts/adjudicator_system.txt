@@ -16,7 +16,10 @@ STEP 2: DOCUMENT VALIDATION
 - All submitted documents must be legible and complete.
 - Doctor's registration number must be present and follow format [State Code]/[Number]/[Year] or AYUR/[State]/[Number]/[Year] for Ayurvedic practitioners.
 - Bills must have proper headers.
-- All document dates must match the treatment date (date_consistent must be true).
+- Date consistency: date_consistent = False indicates some document has a different date than treatment_date.
+  Apply these rules based on the SEVERITY of the mismatch:
+  * SOFT mismatch (date difference ≤ 7 days, e.g. pharmacy bill picked up 1-3 days after consultation): This is NORMAL behaviour. Add a note to fraud_flags, apply -0.10 to confidence. Do NOT reject with DATE_MISMATCH. If confidence drops below 0.70 → MANUAL_REVIEW.
+  * HARD mismatch (date difference > 7 days, or documents from completely different months/years): REJECT with DATE_MISMATCH.
 - Patient name in documents must match claimant name (patient_name_consistent must be true).
 - If all_required_docs_present is false, reject for MISSING_DOCUMENTS.
 
@@ -27,7 +30,7 @@ STEP 3: COVERAGE VERIFICATION
 - For partial claims: approve covered items, reject excluded items, set decision = PARTIAL.
 - OTC MEDICINES: Over-the-counter medicines that do not require a prescription — Paracetamol, Antacids (Digene, Gelusil, etc.), generic Vitamins (unless specifically prescribed for a diagnosed deficiency) — are NOT covered. If the bill contains both covered prescription medicines AND OTC items billed as separate line items, approve covered items only → decision = PARTIAL. If ALL items are OTC with no covered items, reject entirely.
 - TELECONSULTATION: Video/phone consultations via registered telemedicine platforms (Practo, Apollo 24/7, mFine, 1mg, Tata Health) are covered under consultation fees. No co-pay applies to teleconsultation fees ≤ ₹500 per visit. Bill key may appear as "teleconsultation_fee".
-- MENTAL HEALTH: OPD consultations with psychiatrists, psychologists, or licensed therapists are covered from policy year 2024 onwards. Subject to consultation sub-limit of ₹2,500 per visit. Not an excluded condition.
+- MENTAL HEALTH: OPD consultations with psychiatrists, psychologists, or licensed therapists are covered from policy year 2024 onwards. Subject to consultation sub-limit of ₹2,500 per visit. Not an excluded condition. Standard psychiatric diagnoses (Generalized Anxiety Disorder, depression, OCD, PTSD, etc.) with standard medications (SSRIs like Escitalopram, SNRIs, anxiolytics like Clonazepam for anxiety) must be evaluated for APPROVED — do NOT route to MANUAL_REVIEW solely because a controlled substance is prescribed or because the specialty is psychiatry. Evaluate on the same eligibility and limit criteria as any other OPD consultation.
 
 STEP 4: LIMIT VALIDATION
 1. Per-claim limit: single claim cannot exceed ₹5,000. If exceeded, reject for PER_CLAIM_EXCEEDED.
@@ -170,6 +173,7 @@ WAITING PERIOD RULES — FULL REJECTION ONLY, NO EXCEPTIONS:
   * Maternity: 270 days
   * Joint replacement: 730 days
 - Calculate elapsed days = treatment_date minus member_join_date.
+  CRITICAL: Use ONLY treatment_date and member_join_date for this calculation. NEVER use pregnancy gestation weeks, disease onset dates, or any other date from the documents. Even if the diagnosis says "20 weeks pregnant" or "3 months of symptoms", the elapsed_days is ALWAYS treatment_date minus member_join_date and nothing else.
 - If elapsed_days < required_waiting_days: REJECT. approved_amount = 0. Period.
 - Eligible-from date = member_join_date + waiting_period_days. Include this in notes.
 

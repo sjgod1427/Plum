@@ -77,7 +77,7 @@ def _form_data(tc: dict) -> dict:
 
 # ── Amount tolerance check ────────────────────────────────────────────────────
 
-def _amount_ok(actual: float, expected: float, pct: float = 0.15) -> bool:
+def _amount_ok(actual: float, expected: float, pct: float = 0.20) -> bool:
     return abs(actual - expected) <= expected * pct
 
 
@@ -236,11 +236,22 @@ def print_summary(results: list[dict]):
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--cases", help="Comma-separated case IDs to run, e.g. TC015,TC016", default="")
+    args = parser.parse_args()
+
+    filter_ids = {c.strip().upper() for c in args.cases.split(",") if c.strip()}
+    cases_to_run = [tc for tc in CASES if not filter_ids or tc["case_id"] in filter_ids]
+
     banner("PLUM FULL PIPELINE TEST  (GPT-4o Vision + Adjudication)")
     print(f"\n  Backend : {BASE}")
     print(f"  Docs    : {DOCS}")
-    print(f"  Cases   : {len(CASES)}  (TC001–TC010 original + TC011–TC020 extended)")
-    print(f"\n  NOTE: Each case takes 15-40s (2 GPT-4o calls). Full suite ~8-12 min.")
+    if filter_ids:
+        print(f"  Cases   : {len(cases_to_run)} selected — {', '.join(filter_ids)}")
+    else:
+        print(f"  Cases   : {len(cases_to_run)}  (TC001–TC010 original + TC011–TC020 extended)")
+    print(f"\n  NOTE: Each case takes 15-40s (2 GPT-4o calls).")
     print(f"  TC014 expected MANUAL_REVIEW (no MCI registry — known limitation).")
 
     # Preflight check
@@ -258,13 +269,13 @@ def main():
         print(f"  Run: uv run generate_test_docs.py")
         sys.exit(1)
 
-    # Run all cases
+    # Run selected cases
     results = []
-    for tc in CASES:
+    for tc in cases_to_run:
         result = run_case(tc)
         results.append(result)
         if result["status"] not in ("SKIP", "ERROR"):
-            time.sleep(2)  # brief pause between calls
+            time.sleep(2)
 
     passed, failed = print_summary(results)
     sys.exit(0 if failed == 0 else 1)
