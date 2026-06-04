@@ -33,44 +33,7 @@ An AI-powered full-stack web application that automates the adjudication (APPROV
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     Next.js 14 Frontend                      │
-│                                                             │
-│  / (home)   /claims/new   /claims/[id]   /dashboard         │
-│  /admin     /admin/appeals  /admin/policy  /admin/metrics   │
-└──────────────────────────┬──────────────────────────────────┘
-                           │ HTTP REST (multipart / JSON)
-                           ▼
-┌─────────────────────────────────────────────────────────────┐
-│                      FastAPI Backend                         │
-│                                                             │
-│  ┌─────────────────────┐    ┌──────────────────────────┐   │
-│  │   Extractor Agent   │    │   Adjudicator Agent      │   │
-│  │   EasyOCR (free)    │    │   GPT-4o + RAG context   │   │
-│  │   + GPT-4o text     │    │   Structured Output      │   │
-│  └──────────┬──────────┘    └─────────────┬────────────┘   │
-│             │                             │                  │
-│             ▼                             ▼                  │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │              ChromaDB  (RAG vector store)             │   │
-│  │     policy_terms.json  →  11 embedded chunks         │   │
-│  │     text-embedding-3-small  (OpenAI)                 │   │
-│  └──────────────────────────────────────────────────────┘   │
-│                                                             │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │            Email Notification Agent                   │   │
-│  │   GPT-4o-mini + send_email tool (OpenAI tool call)   │   │
-│  │   SendGrid delivery                                   │   │
-│  └──────────────────────────────────────────────────────┘   │
-│                                                             │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │                   SQLite Database                     │   │
-│  │  Claim · ClaimDocument · ClaimDecision               │   │
-│  │  ClaimAppeal · PolicyConfig · EvaluationLog          │   │
-│  └──────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
-```
+![Architecture Diagram](Work_flow.png)
 
 ### Data Flow (end to end)
 
