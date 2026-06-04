@@ -64,6 +64,7 @@ def _form_data(tc: dict) -> dict:
         "hospital_name":            inp.get("hospital"),
         "cashless_request":         inp.get("cashless_request", False),
         "ytd_claimed_amount":       float(inp.get("annual_limit_used", 0.0)),
+        "annual_limit_total":       float(inp["annual_limit_total"]) if inp.get("annual_limit_total") else None,
         "previous_claims_same_day": inp.get("previous_claims_same_day", 0),
         "dependent_name":           inp.get("dependent_name"),
         "dependent_age":            inp.get("dependent_age"),

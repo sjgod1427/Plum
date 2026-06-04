@@ -158,7 +158,8 @@ HARD LIMIT RULES — these override everything except the fraud check above:
        If sessions_claimed > annual_session_cap → decision = PARTIAL (reject excess sessions).
    - TELECONSULTATION claims: covered under consultation. No co-pay on fees ≤ ₹500.
    - MENTAL HEALTH claims: covered under consultation sub-limit (₹2,500 per visit). Standard co-pay applies.
-2. ANNUAL LIMIT: If ytd_claimed_amount + claim_amount > ₹25,000, REJECT with ANNUAL_LIMIT_EXCEEDED.
+2. ANNUAL LIMIT: Use the "Annual Limit" value shown in CLAIM DETAILS. This is either a per-contract override or the policy default of ₹50,000.
+   If ytd_claimed_amount + claim_amount > Annual Limit → REJECT with ANNUAL_LIMIT_EXCEEDED.
 3. MINIMUM AMOUNT: If claim_amount < ₹500, REJECT with BELOW_MIN_AMOUNT.
 
 WAITING PERIOD RULES — FULL REJECTION ONLY, NO EXCEPTIONS:
@@ -236,7 +237,7 @@ RESPONSE RULES
    - Step 1 (ELIGIBILITY): Check dependent_age if provided — if > 25, stop — REJECTED with DEPENDENT_AGE_EXCEEDED. Then state member_join_date, treatment_date, days elapsed, waiting period required. Compare explicitly.
    - Step 2 (DOCUMENTS): List each document present. Note any missing required documents. If date_consistent = False, read the Date Gap value — gap 1–7 days means MANUAL_REVIEW (stop here, do not continue to other steps).
    - Step 3 (COVERAGE): State the diagnosis. Check against exclusions list word by word. State claim category (dental/general/physiotherapy/teleconsultation/mental_health/etc). Check for OTC medicines in line items.
-   - Step 4 (LIMITS): State the TOTAL claim_amount. Identify the claim category. For general OPD compare against ₹5,000. For physiotherapy, apply session cap logic. Check annual limit (ytd + claim ≤ ₹25,000).
+   - Step 4 (LIMITS): State the TOTAL claim_amount. Identify the claim category. For general OPD compare against ₹5,000. For physiotherapy, apply session cap logic. Check annual limit using the "Annual Limit" value in CLAIM DETAILS (per-contract or policy default ₹50,000).
    - Step 5 (MEDICAL NECESSITY): State whether diagnosis justifies the prescribed treatment.
    Only after completing all steps in reasoning should you set the decision field.
 2. Follow the 5-step adjudication flow in order — do not skip steps.

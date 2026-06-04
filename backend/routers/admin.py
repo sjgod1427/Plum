@@ -517,6 +517,7 @@ def _build_direct_request(tc: dict) -> dict:
             "hospital_name": input_data.get("hospital"),
             "cashless_request": input_data.get("cashless_request", False),
             "ytd_claimed_amount": float(input_data.get("annual_limit_used", 0.0)),
+            "annual_limit_total": float(input_data["annual_limit_total"]) if input_data.get("annual_limit_total") else None,
             "previous_claims_same_day": input_data.get("previous_claims_same_day", 0),
             "dependent_name": input_data.get("dependent_name"),
             "dependent_age": input_data.get("dependent_age"),

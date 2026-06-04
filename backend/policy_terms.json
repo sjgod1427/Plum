@@ -8,7 +8,7 @@
     "dependents_covered": true
   },
   "coverage_details": {
-    "annual_limit": 25000,
+    "annual_limit": 50000,
     "per_claim_limit": 5000,
     "family_floater_limit": 150000,
     "consultation_fees": {

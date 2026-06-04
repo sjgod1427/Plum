@@ -260,7 +260,7 @@ Step -1: DUPLICATE CHECK (is_duplicate_claim = True?)
 11. **Test suite uses fixed IDs** (`CLM_TC001`–`CLM_TC020`) with upsert — repeated runs don't accumulate duplicates.
 12. **SQLite for local dev** — switching `DATABASE_URL` to PostgreSQL requires no code changes.
 13. **Email notifications are optional** — silently skipped if SendGrid not configured. Adjudication unaffected.
-14. **Annual OPD limit is ₹25,000** (revised from initial ₹50,000 based on `test_cases_new.json` TC011 scenario).
+14. **Annual OPD limit defaults to ₹50,000** per the original `policy_terms.json`. Individual contracts can override this via the optional `annual_limit_total` field in `ClaimSubmission`. TC011 provides `annual_limit_total: 25000` as a per-contract override — the adjudicator uses whichever limit is passed; if absent, it falls back to the policy default of ₹50,000.
 15. **Dependent child coverage ends at age 25.** Claims for dependents above this age are rejected with `DEPENDENT_AGE_EXCEEDED`.
 16. **Duplicate claim detection trusts `is_duplicate_claim` flag** from caller — no cross-claim DB query in this implementation.
 17. **OTC medicines (Paracetamol, Antacids, Vitamins) are excluded** unless prescribed for a diagnosed deficiency and billed as separate line items alongside covered prescription drugs.

@@ -80,6 +80,7 @@ YTD Claimed     : ₹{submission.ytd_claimed_amount}
 Hospital        : {submission.hospital_name or "Not specified"}
 Cashless Request: {submission.cashless_request}
 Same-day Claims : {submission.previous_claims_same_day}
+Annual Limit    : ₹{int(submission.annual_limit_total) if submission.annual_limit_total else 50000}  ({'per-contract override' if submission.annual_limit_total else 'policy default'})
 Duplicate Flag  : {submission.is_duplicate_claim}
 Previous Claim  : {submission.previous_claim_id or "None"}
 Dependent Name  : {submission.dependent_name or "None"}
