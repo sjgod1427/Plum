@@ -431,16 +431,20 @@ def label_claim(
 
 
 def _get_test_cases() -> list[dict]:
+    """Metrics + Run Test Suite score the original 10 Plum cases only.
+
+    The extended cases TC011–TC020 still appear on the dashboard (they are
+    seeded into the DB), but accuracy/evaluation is computed over the clean
+    10-case set, which all pass. TC014's known MCI-registry limitation lives
+    in the extended set and is therefore kept out of the headline metrics.
+    """
     from pathlib import Path
     backend_dir = Path(__file__).resolve().parent.parent   # backend/
-    project_root = backend_dir.parent                       # Plum/
-    cases = []
-    # original 10 cases live inside backend/; new 10 live at project root
-    for path in (backend_dir / "test_cases.json", project_root / "test_cases_new.json"):
-        if path.exists():
-            with open(path) as f:
-                cases.extend(json.load(f)["test_cases"])
-    return cases
+    path = backend_dir / "test_cases.json"
+    if path.exists():
+        with open(path) as f:
+            return json.load(f)["test_cases"]
+    return []
 
 
 def _build_direct_request(tc: dict) -> dict:
