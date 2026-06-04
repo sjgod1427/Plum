@@ -17,10 +17,10 @@ STEP 2: DOCUMENT VALIDATION
 - Doctor's registration number must be present and follow format [State Code]/[Number]/[Year] or AYUR/[State]/[Number]/[Year] for Ayurvedic practitioners.
 - Bills must have proper headers.
 - Date consistency: use the "Date Gap (days)" value provided in the claim details to determine severity.
-  * Date Gap = 0 (OCR noise — same date): minor OCR formatting difference. Apply -0.05 to confidence only. Decision unaffected.
+  * Date Gap = 0 (OCR noise — same date): minor OCR formatting difference. Apply -0.05 to confidence only. CONTINUE adjudication normally.
   * Date Gap 1–7 days (SOFT — pharmacy pickup delay): Patient picked up medicine after consultation — this is NORMAL. decision MUST be MANUAL_REVIEW. Add "Bill date X days after prescription — possible pharmacy pickup delay" to fraud_flags. Do NOT use REJECTED or DATE_MISMATCH for this case. This rule is absolute — even if all other checks pass, the decision is MANUAL_REVIEW.
   * Date Gap > 7 days (HARD — major mismatch): REJECT with DATE_MISMATCH.
-  * If Date Gap is unknown and date_consistent = False: treat as SOFT — set MANUAL_REVIEW.
+  * Date Gap = unknown (OCR could not parse one or both dates): This is an extraction quality issue, NOT a confirmed date mismatch. Add "Date gap could not be determined — possible OCR noise" to fraud_flags. Apply -0.05 to confidence. CONTINUE adjudication through all remaining steps normally — do NOT stop here, do NOT force MANUAL_REVIEW.
 - Patient name in documents must match claimant name (patient_name_consistent must be true).
 - If all_required_docs_present is false, reject for MISSING_DOCUMENTS.
 
@@ -235,7 +235,7 @@ RESPONSE RULES
    - Step -1 (DUPLICATE): Check is_duplicate_claim. If True, stop — REJECTED with DUPLICATE_CLAIM.
    - Step 0 (FRAUD): State previous_claims_same_day value. If >= 3, stop — MANUAL_REVIEW.
    - Step 1 (ELIGIBILITY): Check dependent_age if provided — if > 25, stop — REJECTED with DEPENDENT_AGE_EXCEEDED. Then state member_join_date, treatment_date, days elapsed, waiting period required. Compare explicitly.
-   - Step 2 (DOCUMENTS): List each document present. Note any missing required documents. If date_consistent = False, read the Date Gap value — gap 1–7 days means MANUAL_REVIEW (stop here, do not continue to other steps).
+   - Step 2 (DOCUMENTS): List each document present. Note any missing required documents. If date_consistent = False, read the Date Gap value — gap 1–7 days means MANUAL_REVIEW (stop here); gap unknown or 0 means OCR noise (note it, continue to next steps).
    - Step 3 (COVERAGE): State the diagnosis. Check against exclusions list word by word. State claim category (dental/general/physiotherapy/teleconsultation/mental_health/etc). Check for OTC medicines in line items.
    - Step 4 (LIMITS): State the TOTAL claim_amount. Identify the claim category. For general OPD compare against ₹5,000. For physiotherapy, apply session cap logic. Check annual limit using the "Annual Limit" value in CLAIM DETAILS (per-contract or policy default ₹50,000).
    - Step 5 (MEDICAL NECESSITY): State whether diagnosis justifies the prescribed treatment.
