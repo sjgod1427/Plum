@@ -22,6 +22,11 @@ export default function NewClaimPage() {
     cashless_request: false,
     ytd_claimed_amount: "0",
     previous_claims_same_day: "0",
+    is_for_dependent: false,
+    dependent_name: "",
+    dependent_age: "",
+    dependent_relation: "",
+    sessions_claimed: "",
   });
 
   function set(key: string, value: string | boolean) {
@@ -38,11 +43,19 @@ export default function NewClaimPage() {
     setError("");
     try {
       const data = {
-        ...form,
+        member_id: form.member_id,
+        member_name: form.member_name,
+        member_join_date: form.member_join_date,
+        treatment_date: form.treatment_date,
         claim_amount: parseFloat(form.claim_amount),
+        hospital_name: form.hospital_name || null,
+        cashless_request: form.cashless_request,
         ytd_claimed_amount: parseFloat(form.ytd_claimed_amount),
         previous_claims_same_day: parseInt(form.previous_claims_same_day),
-        hospital_name: form.hospital_name || null,
+        dependent_name: form.is_for_dependent ? form.dependent_name || null : null,
+        dependent_age: form.is_for_dependent && form.dependent_age ? parseInt(form.dependent_age) : null,
+        dependent_relation: form.is_for_dependent ? form.dependent_relation || null : null,
+        sessions_claimed: form.sessions_claimed ? parseInt(form.sessions_claimed) : null,
       };
       const result = await submitClaim(files, data);
       router.push(`/claims/${result.claim_id}`);
@@ -91,6 +104,40 @@ export default function NewClaimPage() {
               <input className="input" type="number" min="0" value={form.ytd_claimed_amount} onChange={(e) => set("ytd_claimed_amount", e.target.value)} />
             </div>
           </div>
+
+          {/* Dependent toggle */}
+          <div className="mt-4 flex items-center gap-2">
+            <input
+              id="for_dependent"
+              type="checkbox"
+              className="w-4 h-4 accent-plum-600"
+              checked={form.is_for_dependent}
+              onChange={(e) => set("is_for_dependent", e.target.checked)}
+            />
+            <label htmlFor="for_dependent" className="text-sm text-slate-700">This claim is for a dependent</label>
+          </div>
+
+          {form.is_for_dependent && (
+            <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-slate-100">
+              <div>
+                <label className="label">Dependent Name</label>
+                <input className="input" required={form.is_for_dependent} value={form.dependent_name} onChange={(e) => set("dependent_name", e.target.value)} placeholder="Full name" />
+              </div>
+              <div>
+                <label className="label">Age</label>
+                <input className="input" type="number" min="0" max="120" required={form.is_for_dependent} value={form.dependent_age} onChange={(e) => set("dependent_age", e.target.value)} placeholder="e.g. 26" />
+              </div>
+              <div>
+                <label className="label">Relation</label>
+                <select className="input" required={form.is_for_dependent} value={form.dependent_relation} onChange={(e) => set("dependent_relation", e.target.value)}>
+                  <option value="">Select</option>
+                  <option value="Spouse">Spouse</option>
+                  <option value="Son">Son</option>
+                  <option value="Daughter">Daughter</option>
+                </select>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Claim details */}
@@ -112,6 +159,10 @@ export default function NewClaimPage() {
             <div>
               <label className="label">Same-day Claim Count</label>
               <input className="input" type="number" min="0" value={form.previous_claims_same_day} onChange={(e) => set("previous_claims_same_day", e.target.value)} />
+            </div>
+            <div>
+              <label className="label">Physiotherapy Sessions <span className="text-slate-400 font-normal">(if applicable)</span></label>
+              <input className="input" type="number" min="1" value={form.sessions_claimed} onChange={(e) => set("sessions_claimed", e.target.value)} placeholder="e.g. 10" />
             </div>
           </div>
           <div className="mt-4 flex items-center gap-2">

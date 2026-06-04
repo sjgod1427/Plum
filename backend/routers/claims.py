@@ -71,6 +71,17 @@ def submit_claim(
     except Exception as e:
         raise HTTPException(status_code=422, detail=f"Invalid claim data: {e}")
 
+    # Auto-enrich session cap from policy when user provides sessions_claimed
+    if submission.sessions_claimed and submission.annual_session_cap is None:
+        try:
+            import json as _json
+            with open(settings.POLICY_TERMS_PATH) as _f:
+                _policy = _json.load(_f)
+            _cap = _policy.get("coverage_details", {}).get("physiotherapy", {}).get("max_sessions_per_year", 8)
+            submission = submission.model_copy(update={"annual_session_cap": int(_cap)})
+        except Exception:
+            submission = submission.model_copy(update={"annual_session_cap": 8})
+
     claim_id = _new_claim_id()
     upload_dir = Path(settings.UPLOAD_DIR) / claim_id
     upload_dir.mkdir(parents=True, exist_ok=True)
