@@ -257,14 +257,15 @@ Step 0: FRAUD CHECK (same_day_claims >= 3?)
 19. **Teleconsultation** via registered platforms (Practo, Apollo 24/7, etc.) is covered under consultation fees at ₹500/visit with no co-pay.
 20. **Mental health OPD** (psychiatrist/psychologist) is covered from policy year 2024 onwards under consultation sub-limit.
 21. **TC014 (Unregistered Doctor)** cannot be auto-rejected without an MCI registry API lookup. The system validates registration format only; TC014's `MH/99999/2023` is structurally valid. This case routes to MANUAL_REVIEW and is the one known gap in the 20-case suite.
+22. **`annual_session_cap` is auto-read from `policy_terms.json`** by the backend when `sessions_claimed` is provided but cap is absent — the user never has to enter policy-internal limits on the form.
 
 ---
 
 ## Test Cases
 
-All 10 provided test cases pass on both test paths.
+19 / 20 test cases pass on the full OCR pipeline. TC014 is a known limitation (requires external MCI registry API). All 10 original cases pass on both direct submission and full OCR pipeline.
 
-### Direct submission (no OCR) — `test_backend.py`
+### Original 10 cases — direct submission (no OCR) — `test_backend.py`
 
 | ID | Scenario | Expected | Result | Amount |
 |---|---|---|---|---|
@@ -279,7 +280,7 @@ All 10 provided test cases pass on both test paths.
 | TC009 | Weight loss treatment (excluded) | REJECTED | REJECTED | — |
 | TC010 | Apollo Hospitals cashless | APPROVED | APPROVED | ₹3,600 |
 
-### Full OCR pipeline — `test_full_pipeline.py`
+### Original 10 cases — full OCR pipeline — `test_full_pipeline.py`
 
 | ID | Expected | Result | Conf | Time |
 |---|---|---|---|---|
@@ -296,6 +297,23 @@ All 10 provided test cases pass on both test paths.
 
 Total elapsed: ~251s (~25s per case)
 
+### Extended 10 cases — full OCR pipeline — `test_full_pipeline.py`
+
+| ID | Scenario | Expected | Rule tested |
+|---|---|---|---|
+| TC011 | Annual limit exhausted (₹24,800 / ₹25,000 used) | REJECTED | Annual limit ₹25,000 |
+| TC012 | Duplicate claim (previous CLM-20241028-0045) | REJECTED | Duplicate flag detection |
+| TC013 | Dependent age 26 > max 25 | REJECTED | Dependent age limit |
+| TC014 | Doctor reg `MH/99999/2023` not in MCI DB | MANUAL_REVIEW* | Structural reg validation |
+| TC015 | OTC medicines (Paracetamol, Antacid) in bill | PARTIAL | OTC exclusion rule |
+| TC016 | Antenatal check-up after 270-day maternity wait | APPROVED | Maternity waiting period |
+| TC017 | Teleconsultation via Practo ₹500 | APPROVED | Teleconsultation coverage |
+| TC018 | 10 physio sessions, cap is 8 | PARTIAL | Session cap enforcement |
+| TC019 | Bill date 3 days after prescription (mismatch) | MANUAL_REVIEW | Date inconsistency → low confidence |
+| TC020 | Psychiatrist OPD for anxiety disorder | APPROVED | Mental health coverage (2024) |
+
+*TC014 expected REJECTED but system cannot look up MCI registry — routes to MANUAL_REVIEW. Documented limitation.
+
 ---
 
 ## Bonus Features
@@ -311,7 +329,7 @@ Members appeal REJECTED or PARTIAL decisions via UI. Admin resolves (UPHELD / DI
 `/admin/policy` — live JSON editor for all 11 policy sections. Changes persist to DB and automatically re-embed into ChromaDB RAG index.
 
 ### 4. Evaluation Metrics for AI Accuracy
-`/admin/metrics` — accuracy, precision, recall, FPR, FNR, mean amount deviation against the 10 known test cases. "Run Test Suite" re-evaluates live.
+`/admin/metrics` — accuracy, precision, recall, FPR, FNR, mean amount deviation against all 20 test cases. "Run Test Suite" re-evaluates live.
 
 ### 5. CI/CD Pipeline (GitHub Actions)
 Runs on every push: backend tests, frontend lint + type-check, integration test suite, auto-deploy to Modal + Vercel on main branch.
@@ -324,5 +342,5 @@ Policy terms chunked into 11 semantic sections, embedded with `text-embedding-3-
 
 ### 8. Pluggable Extraction Architecture
 Two approaches in code, switchable with one line in `extract_document()`:
-- **Approach A** (active): EasyOCR + GPT-4o — 10/10, ~$0.003/doc
-- **Approach B**: EasyOCR + GPT-4o-mini — 9/10, ~15x cheaper
+- **Approach A** (active): EasyOCR + GPT-4o — 19/20, ~$0.003/doc
+- **Approach B**: EasyOCR + GPT-4o-mini — cheaper but lower accuracy
