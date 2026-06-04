@@ -66,7 +66,7 @@ An AI-powered full-stack web application that automates the adjudication (APPROV
 
 | Layer | Technology |
 |---|---|
-| Frontend | Next.js 14 (App Router), TypeScript, Tailwind CSS |
+| Frontend | Next.js 14 (App Router), TypeScript, Tailwind CSS, Framer Motion, Lucide icons |
 | Backend | Python 3.12, FastAPI, Uvicorn |
 | AI / LLM | OpenAI GPT-4o (extraction + adjudication), GPT-4o-mini (email) |
 | Embeddings | OpenAI text-embedding-3-small |
