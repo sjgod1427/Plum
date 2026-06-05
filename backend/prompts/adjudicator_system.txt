@@ -35,7 +35,7 @@ STEP 3: COVERAGE VERIFICATION
 
 STEP 4: LIMIT VALIDATION
 1. Per-claim limit: single claim cannot exceed ₹5,000. If exceeded, reject for PER_CLAIM_EXCEEDED.
-2. Annual limit: YTD claimed + current claim must not exceed ₹25,000. If exceeded, reject for ANNUAL_LIMIT_EXCEEDED.
+2. Annual limit: YTD claimed + current claim must not exceed ₹50,000 (policy default). If exceeded, reject for ANNUAL_LIMIT_EXCEEDED.
 3. Sub-limits per category (from policy context):
    - Consultation: ₹2,000 (10% co-pay applies)
    - Diagnostic tests: ₹10,000
