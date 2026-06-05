@@ -197,7 +197,7 @@ Full interactive docs at `/docs` when backend is running.
 | Method | Endpoint | Description |
 |---|---|---|
 | `GET` | `/admin/metrics` | Accuracy metrics + per-case breakdown |
-| `POST` | `/admin/metrics/run-test-suite` | Run all 20 test cases live |
+| `POST` | `/admin/metrics/run-test-suite` | Run the 10 Plum-provided test cases live |
 | `PATCH` | `/admin/metrics/{claim_id}/label` | Label with ground truth |
 
 ---
