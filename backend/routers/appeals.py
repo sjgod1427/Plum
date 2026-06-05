@@ -191,6 +191,7 @@ def resolve_appeal(
     if is_upheld:
         new_decision = ClaimDecision(
             claim_id=appeal.claim_id,
+            reasoning=f"Appeal upheld by reviewer. Original AI decision overridden. {body.reviewer_notes}",
             decision=body.new_decision,
             approved_amount=body.approved_amount,
             rejection_reasons=json.dumps([]),

@@ -82,7 +82,9 @@ def update_admin_config(body: dict, session: Session = Depends(get_session)):
 
 @router.get("/policy")
 def get_policy(session: Session = Depends(get_session)):
-    configs = session.exec(select(PolicyConfig)).all()
+    configs = session.exec(
+        select(PolicyConfig).where(PolicyConfig.section != "admin_config")
+    ).all()
 
     if not configs:
         # Fall back to loading from the source file
@@ -143,7 +145,9 @@ def update_policy_section(
 
 @router.post("/policy/rebuild-rag")
 def rebuild_rag(session: Session = Depends(get_session)):
-    configs = session.exec(select(PolicyConfig)).all()
+    configs = session.exec(
+        select(PolicyConfig).where(PolicyConfig.section != "admin_config")
+    ).all()
 
     if configs:
         sections = [{"section": c.section, "config_json": c.config_json} for c in configs]

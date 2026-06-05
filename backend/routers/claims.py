@@ -107,7 +107,11 @@ def submit_claim(
         # Save files and extract
         extracted_docs = []
         for file in files:
-            file_path = upload_dir / (file.filename or f"doc_{len(extracted_docs)}.jpg")
+            if file.filename:
+                file_path = upload_dir / file.filename
+            else:
+                ext = ".pdf" if (file.content_type or "").startswith("application/pdf") else ".jpg"
+                file_path = upload_dir / f"doc_{len(extracted_docs)}{ext}"
             contents = file.file.read()
             with open(file_path, "wb") as f:
                 f.write(contents)
@@ -160,6 +164,17 @@ def submit_direct_claim(
     claim_id = _new_claim_id()
     submission = body.submission
     extraction = body.extraction
+
+    # Auto-enrich session cap from policy when caller provides sessions_claimed but not the cap
+    if submission.sessions_claimed and submission.annual_session_cap is None:
+        try:
+            import json as _json
+            with open(settings.POLICY_TERMS_PATH) as _f:
+                _policy = _json.load(_f)
+            _cap = _policy.get("coverage_details", {}).get("physiotherapy", {}).get("max_sessions_per_year", 8)
+            submission = submission.model_copy(update={"annual_session_cap": int(_cap)})
+        except Exception:
+            submission = submission.model_copy(update={"annual_session_cap": 8})
 
     claim = Claim(
         id=claim_id,
